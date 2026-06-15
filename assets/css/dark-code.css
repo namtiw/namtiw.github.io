@@ -1,0 +1,85 @@
+/* Dark-theme code blocks — overrides the light pygment_highlights.css.
+   Gives <pre> blocks and inline <code> a dark panel and a light-on-dark
+   syntax palette so code stays readable on a dark page background. */
+
+/* Page background gradient (overrides the solid page-col).
+   Diagonal fade across the slate range, fixed so it doesn't scroll. */
+body {
+  background-image: linear-gradient(to bottom, #15202E 0%, #0A111E 45%, #03060C 100%);
+  background-attachment: fixed;
+}
+
+/* Home-page action buttons (About / Blog). Scoped to <a> > <button> so the
+   navbar toggler button is untouched. The referenced /css/button.css is
+   missing, so without this they fall back to invisible default styling. */
+.container-fluid a > button {
+  background-color: transparent;
+  color: #E2E8F0;
+  border: 1px solid #38BDF8;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1.5rem;
+  margin: 0 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.container-fluid a > button:hover,
+.container-fluid a > button:focus {
+  background-color: #38BDF8;
+  color: #0F172A;
+}
+
+/* Inline code */
+code {
+  color: #7DD3FC;
+  background-color: #16233B;
+  border: 1px solid #1E293B;
+}
+
+/* Code block panel */
+pre,
+.highlight > pre,
+.highlight pre.lineno {
+  color: #E2E8F0;
+  background-color: #111C30 !important;
+}
+
+.highlight > pre {
+  background-image: linear-gradient(
+    rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03) 1.5em,
+    rgba(255, 255, 255, 0.015) 1.5em, rgba(255, 255, 255, 0.015) 3em) !important;
+  border: 1px solid #1E293B;
+  border-left: 0.4375rem solid #38BDF8;
+}
+
+pre code {
+  color: #E2E8F0;
+  background-color: transparent;
+  border: none;
+}
+
+.highlight pre.lineno {
+  color: rgba(226, 232, 240, 0.35);
+  border-right: 2px solid #1E293B;
+}
+
+/* --- Rouge syntax tokens (light-on-dark) --- */
+.highlight .c, .highlight .cm, .highlight .c1, .highlight .cs,
+.highlight .cp, .highlight .cd { color: #6B8779; font-style: italic; }   /* comments */
+.highlight .k, .highlight .kc, .highlight .kd, .highlight .kn,
+.highlight .kp, .highlight .kr, .highlight .kt { color: #FF79C6; font-weight: bold; } /* keywords */
+.highlight .o, .highlight .ow { color: #8BE9FD; }                        /* operators */
+.highlight .n, .highlight .na, .highlight .nb, .highlight .nx { color: #D7E3DC; } /* names */
+.highlight .nf, .highlight .nd { color: #50FA7B; }                       /* function names */
+.highlight .nc, .highlight .nn { color: #8BE9FD; font-weight: bold; }    /* class/namespace */
+.highlight .nt { color: #FF79C6; }                                       /* HTML/XML tags */
+.highlight .s, .highlight .s1, .highlight .s2, .highlight .sb,
+.highlight .sc, .highlight .sd, .highlight .se, .highlight .sh,
+.highlight .si, .highlight .sx, .highlight .sr, .highlight .ss { color: #F1FA8C; } /* strings */
+.highlight .m, .highlight .mf, .highlight .mh, .highlight .mi,
+.highlight .mo, .highlight .il { color: #BD93F9; }                       /* numbers */
+.highlight .nv, .highlight .vc, .highlight .vg, .highlight .vi { color: #FFB86C; } /* variables */
+.highlight .gd { color: #FF7B72; background-color: #2D1416; }            /* diff deleted */
+.highlight .gi { color: #7EE787; background-color: #11271A; }            /* diff inserted */
+.highlight .err { color: #FF7B72; background-color: transparent; }       /* errors */

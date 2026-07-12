@@ -72,7 +72,15 @@ The variable names are chosen intentionally to tie into ML naming conventions.
 The original [photoperceptron](https://com-cog-book.github.io/com-cog-book/features/perceptron.html) developed by Rosenblatt drew interesting inspirations from biology; we discuss a slight variation that is today most widely recognised as the Perceptron.
 
 The notion of a linear function that outputs the class of a 2d point can be represented as a network of mathematical operations on the input coordinates.
-+diagram of perceptron single layer with two inputs and one output going into step function+
+
+<pre class="mermaid">
+flowchart LR
+  X1(["x₁"]) -- "w₁" --> S["Σ&nbsp;&nbsp;weighted sum<br/>w₁x₁ + w₂x₂ + b"]
+  X2(["x₂"]) -- "w₂" --> S
+  B(["b"]) --> S
+  S -- "z" --> F["step function<br/>f(z), threshold T"]
+  F --> Y(["y′ = 0 or 1"])
+</pre>
 
 $$y' = f(w_1 x_1 + w_2 x_2 + b) \tag{2}$$
 
@@ -91,14 +99,28 @@ Generalizing over the dataset, for the $i$-th point $(x_{1i}, x_{2i})$, $y_i$ is
 
 $$y'_i = f(w_1 x_{1i} + w_2 x_{2i} + b) \tag{4}$$
 
-+diagram showing y and y' as network output and true value so we don't need to explain+
+<pre class="mermaid">
+flowchart LR
+  DS[("Dataset")] -- "(x₁ᵢ, x₂ᵢ)" --> N["Network"]
+  N --> YP(["y′ᵢ&nbsp;&nbsp;prediction"])
+  DS -- "label" --> Y(["yᵢ&nbsp;&nbsp;true value"])
+  YP --> E["error<br/>yᵢ − y′ᵢ"]
+  Y --> E
+</pre>
+
 The difference between the network output (prediction) and the true value, $y_i - y'_i$, represents the error in our classification. The algorithm states that for each datapoint, a correction equal to this error, scaled by a factor $\eta$, is applied to the parameters:
 
 $$w_j \leftarrow w_j + \eta \, (y_i - y'_i) \, x_{ji} \qquad b \leftarrow b + \eta \, (y_i - y'_i) \tag{5}$$
 
 The scaling factor $\eta$ controls the effect each wrong classification has on the parameter update. This is known as the learning rate, since increasing it means the program takes faster steps towards the right answers in the dataset. Eventually, after applying similar nudges for enough datapoints, the parameters converge to stable values that correctly classify the dataset. One adjustment step in this iterative process is illustrated in the following figure.
 
-+diagram showing one input passing through network, producing output then using it to adjust weights represents this happens iteratively for each point in the input dataset+
+<pre class="mermaid">
+flowchart TD
+  DS[("Dataset")] -- "next point<br/>(x₁ᵢ, x₂ᵢ), yᵢ" --> N["Network<br/>w₁, w₂, b"]
+  N -- "y′ᵢ" --> C["Compare<br/>error = yᵢ − y′ᵢ"]
+  C -- "scale by η" --> U["Adjust w₁, w₂, b<br/>eq. (5)"]
+  U -. "repeat for each point" .-> DS
+</pre>
 
 ##### Learning visualized
 

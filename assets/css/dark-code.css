@@ -59,6 +59,14 @@ pre code {
   border: none;
 }
 
+/* Mermaid diagrams: rendered SVG, not code — no code panel styling */
+pre.mermaid {
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none;
+  text-align: center;
+}
+
 .highlight pre.lineno {
   color: rgba(226, 232, 240, 0.35);
   border-right: 2px solid #1E293B;

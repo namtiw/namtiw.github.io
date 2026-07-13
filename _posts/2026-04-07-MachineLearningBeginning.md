@@ -28,12 +28,12 @@ flowchart LR
   end
 </pre>
 
-The next few posts document my pedagogical exercise of building a decoder only Transformer network from scratch. The aim is to develop an intuitive understanding of the architecture most modern LLMs use and implement it from scratch in JAX, to reason about how massive models are designed piece by piece and what the learning process looks like for these networks. ***Intended as my notes for ML concepts, starting from basic math and computer science principles.*** To follow along, a basic understanding of linear algebra (matrix multiplication), calculus (gradients and partial derivatives), and Python programming is a prerequisite; no prior knowledge of machine learning is required.
+The next few posts document my pedagogical exercise of building a decoder only Transformer network from scratch[^karpathy]. The aim is to develop an intuitive understanding of the architecture most modern LLMs use and implement it from scratch in JAX, to reason about how massive models are designed piece by piece and what the learning process looks like for these networks. ***Intended as my notes for ML concepts, starting from basic math and computer science principles.*** To follow along, a basic understanding of linear algebra (matrix multiplication), calculus (gradients and partial derivatives), and Python programming is a prerequisite; no prior knowledge of machine learning is required.
 
 <div class="collapsiblecontainer">
 <div class="collapsibleheader"><span>+ </span>A note on terminology: model, network, LLM</div>
 <div class="collapsiblecontent" markdown="1">
-These posts use *model*, *network*, and *LLM* somewhat interchangeably. Strictly: the network is the architecture, the graph of operations and its parameter slots; a model is a network together with a specific set of learned parameter values; an LLM (large language model) is a model with a Transformer architecture whose parameters were trained on large text corpora.
+These posts use the terms *model*, *network*, and *LLM* somewhat interchangeably. Strictly speaking, the network is the architecture: the graph of operations together with its parameter slots. A model is a network combined with a specific set of learned parameter values. An LLM (large language model) is a model with a Transformer architecture whose parameters were trained on large text corpora.
 </div>
 </div>
 
@@ -46,9 +46,9 @@ The Perceptron, introduced by Frank Rosenblatt in 1958[^rosenblatt], is a binary
 <div class="collapsiblecontent" markdown="1">
 The perceptron was not the first mathematical model of a neuron. Warren McCulloch and Walter Pitts published one in 1943, but their neurons had fixed, hand-set connections; it was a theory of computation, not of learning. Rosenblatt's contribution at Cornell Aeronautical Laboratory was a working system that acquired its parameters from labelled examples[^brenndoerfer].
 
-The urgency and funding came from the Cold War. Military agencies wanted machines that could pick out aircraft or tanks in aerial photographs without teams of human analysts, and a pattern recognizer that adapts from examples promised exactly that. The contrast with the programming practice of the day was stark: an optical character recognizer, for instance, was built from hand-crafted rules about the loops and strokes of each letter, every rule individually coded, debugged, and refined. The perceptron replaced rule writing with data curation, supply labelled examples and let the algorithm assign the feature weights. It also gave the field its first formal learning guarantee, the convergence theorem above.
+The urgency and funding came from the Cold War[^coldwar]. Military agencies wanted machines that could pick out aircraft or tanks in aerial photographs without teams of human analysts, and a pattern recognizer that adapts from examples promised exactly that. The contrast with the programming practice of the day was stark: an optical character recognizer, for instance, was built from hand-crafted rules about the loops and strokes of each letter, every rule individually coded, debugged, and refined. The perceptron replaced rule writing with data curation: instead of coding the rules, an engineer supplies labelled examples and lets the algorithm assign the feature weights. It also gave the field its first formal learning guarantee, the convergence theorem above.
 
-The design borrowed loosely from biology: a neuron collects signals through its dendrites and fires down its axon once the combined stimulation crosses a threshold. The weighted sum and step function mirror exactly this.
+The design borrowed loosely from biology: a neuron collects signals through its dendrites and fires down its axon once the combined stimulation crosses a threshold. The weighted sum and the step function mirror this behaviour exactly.
 </div>
 </div>
 
@@ -60,10 +60,9 @@ Let's break this down into a simpler subproblem. Assume our data has two identif
 
 $$w_1 x_1 + w_2 x_2 + b = 0 \tag{1}$$
 
-Hence the objective, given a set of points in 2D space learn the parameters $w_1$, $w_2$, $b$ such that it divides the space with different class of points on either side.
+This gives us our objective: given a set of points in 2D space, learn the parameters $w_1$, $w_2$, and $b$ of a line that divides the space with a different class of points on either side.
 
-+a diagram here to represent the dataset of points and explain the equation of plane+
-points in 2d space two classes represented as blue and red
++diagram: dataset of points in 2D space, two classes as blue and red, with the separating line of equation (1)+
 
 The variable names are chosen intentionally to tie into ML naming conventions.
 
@@ -91,8 +90,17 @@ $$f(z) = \begin{cases} 1 & \text{if } z \geq T \\ 0 & \text{if } z < T \end{case
 The step function helps translate the continuous output of the linear function into discrete values which can be interpreted as classes. Note that the threshold $T$ is redundant given the bias: rewriting $z \geq T$ as $z - T \geq 0$ folds $T$ into $b$, so by convention the threshold is set to $0$.
 Intuitively, this can be thought of as a weighted sum of features that govern a dataset. In the Shakespearean analogy, a wedding finale contributes differently to a particular work being a comedy than the death of a protagonist, and the combined effect must pass a certain threshold (step function) to qualify as a comedy.
 
-+run one pass through the network using two plays as examples, assume some weights+
-For a given input, the network's decision depends on $w_1$, $w_2$, $b$, and the threshold.
+To make this concrete, let us run two plays through the network using an assumed set of parameters. The features are binary: $x_1 = 1$ if the story ends with a wedding, $x_2 = 1$ if a main character dies, and a comedy is encoded as $y = 1$. Assume the network has the weights $w_1 = 0.8$, $w_2 = -0.9$, the bias $b = 0.2$, and a threshold of $0$.
+
+For *A Midsummer Night's Dream*, which ends in weddings and spares its main characters, the input is $(x_1 = 1, x_2 = 0)$:
+
+$$z = 0.8 \cdot 1 + (-0.9) \cdot 0 + 0.2 = 1.0 \geq 0 \implies y' = 1 \text{ (comedy)}$$
+
+For *Hamlet*, where no wedding closes the play and the protagonist dies, the input is $(x_1 = 0, x_2 = 1)$:
+
+$$z = 0.8 \cdot 0 + (-0.9) \cdot 1 + 0.2 = -0.7 < 0 \implies y' = 0 \text{ (not comedy)}$$
+
+The wedding feature carries a positive weight and pushes the weighted sum over the threshold, while the death feature carries a negative weight and holds it under. Flipping the sign of either weight would cause the same inputs to produce wrong classifications: for a given input, the network's decision depends entirely on the values of $w_1$, $w_2$, $b$, and the threshold.
 #### Learning algorithm
 
 Generalizing over the dataset, for the $i$-th point $(x_{1i}, x_{2i})$, $y_i$ is the true label from the dataset and $y'_i$ is the network output:
@@ -128,11 +136,92 @@ The mathematical operations in the above pass through the network are succinctly
 
 $$y' = f(W\mathbf{x} + b), \qquad W = \begin{bmatrix} w_1 & w_2 \end{bmatrix}, \quad \mathbf{x} = \begin{bmatrix} x_1 \\ x_2 \end{bmatrix} \tag{6}$$
 
-For a single perceptron $W$ has one row. Each additional neuron in a layer adds a row, and the same matrix product computes every neuron's weighted sum at once.
+For a single perceptron, $W$ has one row. Each additional neuron in a layer adds a row, and the same matrix product computes every neuron's weighted sum at once.
 
-+ talk is cheap show me the code+
-Translating from English to Python gives us the following. Note, each iteration of the loop takes a dataset input value, passes it through the network, and then compares the result to the expected output. The difference dictates the adjustment in network parameters. Thus, with each step the network's decision boundary is nudged towards the correct final state.
-+JAX concepts used here, see below+
+Translating from English to Python gives us the following. We start with a dataset of two gaussian blobs in a 2D feature space, which stand in for our two classes of plays.
+
+```python
+import jax
+import jax.numpy as jnp
+
+# two gaussian blobs in 2D feature space, labelled 0 and 1, shuffled
+def make_dataset(key, n_per_class=1000):
+  k0, k1, kshuffle = jax.random.split(key, 3)
+  # centres at +/-3 keep the blobs linearly separable even at 1000 points per class
+  class0 = jax.random.normal(k0, (n_per_class, 2)) + 3.0
+  class1 = jax.random.normal(k1, (n_per_class, 2)) - 3.0
+  x = jnp.vstack([class0, class1])
+  y = jnp.concatenate([jnp.zeros(n_per_class), jnp.ones(n_per_class)])
+  # shuffle so the training loop sees the two classes interleaved
+  indices = jax.random.permutation(kshuffle, jnp.arange(x.shape[0]))
+  return x[indices], y[indices]
+```
+
+The network is a direct translation of equations (2), (3) and (6):
+
+```python
+# weighted sum of the inputs, equation (6): z = Wx + b
+def layer(w, b, x):
+  return jnp.dot(x, w) + b
+
+# step activation, equation (3): 1 if z >= threshold else 0
+def step(z, threshold=0.0):
+  return jnp.where(z >= threshold, 1.0, 0.0)
+
+# forward pass, equation (2): y' = f(Wx + b)
+def perceptron(w, b, x):
+  return step(layer(w, b, x))
+```
+
+The error and the update rule follow equation (5):
+
+```python
+# error for a single point: y - y'
+def loss(y_true, y_pred):
+  return (y_true - y_pred).squeeze()
+
+# perceptron update rule, equation (5): nudge parameters by the scaled error
+def update_weights(w, b, xi, error, lr):
+  w = w + lr * error * xi.T
+  b = b + lr * error
+  return w, b
+```
+
+Each iteration of the training loop takes a dataset input value, passes it through the network, and then compares the result to the expected output. The difference dictates the adjustment in network parameters. Thus, with each step the network's decision boundary is nudged towards the correct final state. One full pass through every example in the dataset is called an epoch; the convergence theorem guarantees a solution after finitely many epochs on separable data, so a single epoch is often not enough.
+
+```python
+# a single learning step for one example: forward pass, error, update
+def train_step(w, b, xi, yi, lr):
+  y_pred = perceptron(w, b, xi)
+  error = loss(yi, y_pred)
+  return update_weights(w, b, xi, error, lr)
+
+# one epoch = one pass through every example in the dataset
+def train(w, b, x, y, lr=0.01, epochs=1):
+  for epoch in range(epochs):
+    for i in range(x.shape[0]):
+      w, b = train_step(w, b, x[i].reshape(1, -1), y[i], lr)
+  return w, b
+```
+
+Finally, we generate the data, initialize the parameters randomly, and train:
+
+```python
+rng = jax.random.key(42)
+
+rng, subkey = jax.random.split(rng)
+x, y = make_dataset(subkey)
+
+# initialize parameters randomly, one key per parameter
+rng, wkey, bkey = jax.random.split(rng, 3)
+w = jax.random.normal(wkey, (2, 1))
+b = jax.random.normal(bkey, (1,))
+
+w, b = train(w, b, x, y)
+```
+
+The JAX specific pieces, `jax.random.key` and the explicit key splitting, are covered in the [JAX section](#jax) below. The full notebook, including the plotting and animation code, is available [here](/assets/notebooks/perceptron.ipynb).
+
 +show a slider with animation so each example step and nudge can be visualized+
 
 Take a moment to appreciate that from a simple loop in Python and some datapoints emerges spatial reasoning capability, in the feature dimensions, in a deterministic digital machine. The New York Times called this the "embryo of an electronic computer" at the time[^nyt].
@@ -149,20 +238,52 @@ There are two levers to pull: adding more layers to the network and increasing t
 <div class="collapsiblecontainer">
 <div class="collapsibleheader"><span>+ </span>What is a neuron?</div>
 <div class="collapsiblecontent" markdown="1">
-A neuron (also called a unit or node) is the smallest building block of a network: it computes a weighted sum of its inputs, adds a bias, and applies an activation function, exactly equation (2). A layer is a set of neurons reading the same inputs; in the matrix form of equation (6), each neuron is one row of $W$. The name is a loose biological metaphor and carries no further meaning here.
+A neuron (also called a unit or node) is the smallest building block of a network: it computes a weighted sum of its inputs, adds a bias, and applies an activation function, the same computation we saw in equation (2). A layer is a set of neurons that read the same inputs; in the matrix form of equation (6), each neuron is one row of $W$. The name is a loose biological metaphor and carries no further meaning here.
 </div>
 </div>
 
-The $w_i$ are parameters of the model. As seen above, these control the contribution of a feature to the weighted sum, hence they are known as the weights of a model. The decision tree branching is controlled by the bias ($b$) and activation (step function) terms of a neuron. For instance, +from the diagram explain neuron 3 layer 2 has affinity to be activated, output 1 whenever neuron 4 in layer 1 is active will have a higher weight associated with the corresponding link+ For an individual neuron, its affinity to activate is controlled by the bias term and activation: a higher bias implies a higher weighted sum, and a lower activation threshold implies a lower value of the sum activates the neuron.
+<pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 45, "rankSpacing": 90}}}%%
+flowchart LR
+  X1(["x₁"]) --> A1 & A2 & A3 & A4
+  X2(["x₂"]) --> A1 & A2 & A3 & A4
+  subgraph L1["Layer 1"]
+    A1(("1")); A2(("2")); A3(("3")); A4(("4"))
+  end
+  subgraph L2["Layer 2"]
+    B1(("1")); B2(("2")); B3(("3"))
+  end
+  A1 --> B1 & B2 & B3
+  A2 --> B1 & B2 & B3
+  A3 --> B1 & B2 & B3
+  A4 --> B1 & B2
+  A4 -- "w₄₃" --> B3
+  B1 --> O(["y′"])
+  B2 --> O
+  B3 --> O
+  classDef neuron font-size:22px
+  class A1,A2,A3,A4,B1,B2,B3 neuron
+  linkStyle default stroke:#475569,stroke-width:1px
+  linkStyle 19 stroke:#F59E0B,stroke-width:3px
+</pre>
 
-Two notable aspects of the learning algorithm are the measure of the error in its output and the incremental corrections to reduce this error. The error in ML papers is often referred to as the Loss. It has been empirically shown[^goodfellow] that as models get deeper (higher number of layers, higher number of weights to be learnt) a simple difference based loss is too choppy, and functions like root mean square result in smoother updates to the network at each step. Mathematically, the relation between input and output is represented by a complex higher order function. Unlike the linear case, each neuron (weight term) in a layer contributes to the loss differently. In order to correctly update each weight according to its effect on the loss, backpropagation is used. Think of the loss as a curve: for any given point on the curve, the direction of a minimum can be deduced using the slope of the tangent (gradient) at that point. +show diagram with a curve and a gradient at a point show both a negative and positive gradient+ Hence, the partial derivative of the loss with respect to each weight gives the gradient at a point with respect to that weight, exactly what is needed here to update the weight. The weights in layers deeper into the network can be similarly derived using partial derivatives of the loss. Since the derivatives with respect to the weights of the following layer are already known, the chain rule can be used to avoid recalculations. Hence, the process of moving backwards in the network and calculating partial derivatives at each step using derivatives from a later step is known as backpropagation. The gradients can then be scaled and used to update the weights of the network during training. Andrej Karpathy's Zero to Hero series is a great resource to understand this concept, as he manually shows the forward pass to get the loss and then the backward pass to propagate the gradients through a network.
+The $w_i$ are parameters of the model; every arrow in the figure above carries one. As seen above, these control the contribution of a feature to the weighted sum, hence they are known as the weights of a model. The decision tree branching is controlled by the bias ($b$) and activation (step function) terms of a neuron. For instance, suppose that in the network above, neuron 3 in layer 2 should activate whenever neuron 4 in layer 1 is active. Training will assign a large weight to the link between them, labelled $w_{43}$ and highlighted in the figure, so that neuron 4's output dominates neuron 3's weighted sum and reliably pushes it over the activation threshold. For an individual neuron, its affinity to activate is controlled by the bias term and activation: a higher bias implies a higher weighted sum, and a lower activation threshold implies a lower value of the sum activates the neuron.
+
+Two notable aspects of the learning algorithm are the measure of the error in its output and the incremental corrections to reduce this error. The error in ML papers is often referred to as the Loss. The raw difference $y - y'$ served the perceptron's update rule, but it makes a poor loss for deeper networks. A signed difference rewards overshooting in the negative direction, and taking its absolute value instead leaves a kink at zero where the derivative is undefined. Squaring the difference fixes both problems: the loss is positive for any mistake, smooth and differentiable everywhere, and its gradient grows with the size of the error, so badly wrong predictions produce large corrections while nearly correct ones barely move the weights[^goodfellow]. This gives the mean squared error, along with its square root, the root mean squared error. The differentiability is what deeper networks need, since they are trained by following gradients of the loss through every layer. Mathematically, the relation between input and output is represented by a complex higher order function. Unlike the linear case, each neuron (weight term) in a layer contributes to the loss differently. In order to correctly update each weight according to its effect on the loss, backpropagation is used. Think of the loss as a curve: for any given point on the curve, the direction of a minimum can be deduced using the slope of the tangent (gradient) at that point.
+
+<figure>
+<img src="/assets/img/loss-gradient.svg" alt="Squared error loss curve with tangents at two points; the gradient is negative left of the minimum and positive right of it, and arrows point toward the minimum where the gradient is zero">
+<figcaption>The sign of the gradient tells us which side of the minimum we are on; stepping against it always reduces the loss.</figcaption>
+</figure>
+
+Hence, the partial derivative of the loss with respect to each weight gives the gradient at a point with respect to that weight, exactly what is needed here to update the weight. The weights in layers deeper into the network can be similarly derived using partial derivatives of the loss. Since the derivatives with respect to the weights of the following layer are already known, the chain rule can be used to avoid recalculations. Hence, the process of moving backwards in the network and calculating partial derivatives at each step using derivatives from a later step is known as backpropagation. The gradients can then be scaled and used to update the weights of the network during training. Andrej Karpathy's Zero to Hero series[^karpathy] is a great resource to understand this concept, as he manually shows the forward pass to get the loss and then the backward pass to propagate the gradients through a network.
 
 #### JAX
 [JAX](https://docs.jax.dev/en/latest/) is a Python framework which makes developing new network architectures and training them easier by abstracting away tedious parts like handrolling gradient calculations at each layer and weight updates.
 <div class="collapsiblecontainer">
 <div class="collapsibleheader"><span>+ </span>Why JAX over PyTorch?</div>
 <div class="collapsiblecontent" markdown="1">
-Both frameworks provide the two things that are tedious to handroll: automatic differentiation and accelerator-ready array operations. PyTorch goes further, packaging layers, parameter state, and training utilities into `nn.Module` objects. JAX stays close to NumPy: parameters live in explicit data structures the programmer passes around, and a model is a pure function of parameters and inputs. For a from-scratch exercise this is the point, nothing is hidden and every weight update is visible in code, which also permits more control over complex network implementations. Fewer abstractions additionally mean fewer places for implicit behavior to hide: shape pitfalls such as the `keepdims` dilemma in reduction operations still exist, but they sit in code you wrote and can inspect, rather than inside a framework module where they lead to sneaky training bugs.
+Both frameworks take care of the two genuinely tedious parts of deep learning, computing gradients automatically and running array math on accelerators. The difference lies in how much they manage for you. PyTorch wraps layers, parameter state, and training utilities into `nn.Module` objects that track everything behind the scenes. Working in JAX feels closer to working in NumPy. Parameters are ordinary data structures that you create and pass around yourself, and a model is a plain function that maps parameters and inputs to outputs. Since the goal of this exercise is to see every moving part, that explicitness is a feature rather than a burden, and it leaves room for more control once the networks get complicated. It also means there are fewer places for surprising behavior to hide. Pitfalls like the `keepdims` dilemma in reduction operations do not disappear, but they live in code you wrote and can inspect, instead of surfacing as silent training bugs somewhere inside a framework module.
 </div>
 </div>
 
@@ -181,12 +302,13 @@ Given enough data and a capable model architecture, interesting emergent propert
 +Anthropic discovering consciousness like properties in networks shows this black box nature and emergent properties, a sentence on this and a link out+
 
 ### References
-This series is heavily inspired by Andrej Karpathy's [Neural Networks: Zero to Hero](https://karpathy.ai/zero-to-hero.html) series, which is worth watching in full. These posts document a similar journey, building a Transformer based model from scratch, but in JAX, with a different set of examples for intuition and a different final product.
 
+[^karpathy]: This series is heavily inspired by Andrej Karpathy's [Neural Networks: Zero to Hero](https://karpathy.ai/zero-to-hero.html) lecture series, which is worth watching in full. These posts document a similar journey, building a Transformer based model from scratch, but in JAX, with a different set of examples for intuition and a different final product.
 [^he]: He, K., Zhang, X., Ren, S., & Sun, J. (2015). [Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification](https://arxiv.org/abs/1502.01852). IEEE International Conference on Computer Vision (ICCV).
 [^rosenblatt]: Rosenblatt, F. (1958). [The perceptron: A probabilistic model for information storage and organization in the brain](https://doi.org/10.1037/h0042519). Psychological Review, 65(6), 386-408.
 [^cornell]: [Professor's perceptron paved the way for AI, 60 years too soon](https://news.cornell.edu/stories/2019/09/professors-perceptron-paved-way-ai-60-years-too-soon). Cornell Chronicle, September 2019.
 [^brenndoerfer]: Brenndoerfer, M. (2025). [The Perceptron, Foundation of Modern Neural Networks](https://mbrenndoerfer.com/writing/history-perceptron-neural-network-foundation).
+[^coldwar]: Rosenblatt's perceptron research at Cornell Aeronautical Laboratory was funded by the U.S. Office of Naval Research, which staged the July 1958 public demonstration. See Olazaran, M. (1996). [A Sociological Study of the Official History of the Perceptrons Controversy](https://doi.org/10.1177/030631296026003005). Social Studies of Science, 26(3), 611-659.
 [^novikoff]: Novikoff, A. B. (1962). On convergence proofs on perceptrons. Proceedings of the Symposium on the Mathematical Theory of Automata, 12, 615-622. Known as the perceptron convergence theorem.
 [^nyt]: [New Navy Device Learns By Doing](https://www.nytimes.com/1958/07/08/archives/new-navy-device-learns-by-doing-psychologist-shows-embryo-of.html). The New York Times, July 8, 1958.
 [^bronx]: Both attended the Bronx High School of Science, one year apart. See [Frank Rosenblatt](https://en.wikipedia.org/wiki/Frank_Rosenblatt), Wikipedia.

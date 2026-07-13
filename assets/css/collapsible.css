@@ -21,3 +21,13 @@
 figcaption {
   text-align: center;
 }
+
+/* center figure content (images, GIFs) in posts */
+figure {
+  text-align: center;
+}
+figure img {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+}

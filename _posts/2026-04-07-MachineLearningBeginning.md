@@ -62,7 +62,10 @@ $$w_1 x_1 + w_2 x_2 + b = 0 \tag{1}$$
 
 This gives us our objective: given a set of points in 2D space, learn the parameters $w_1$, $w_2$, and $b$ of a line that divides the space with a different class of points on either side.
 
-+diagram: dataset of points in 2D space, two classes as blue and red, with the separating line of equation (1)+
+<figure>
+<img src="/assets/img/dataset-scatter.svg" alt="Scatter plot of two classes of points in a 2D feature space, red in the upper right and blue in the lower left, separated by a straight line labelled with equation (1)">
+<figcaption>An illustrative dataset: two classes of points in a 2D feature space, cleanly divided by the line of equation (1).</figcaption>
+</figure>
 
 The variable names are chosen intentionally to tie into ML naming conventions.
 
@@ -217,15 +220,24 @@ rng, wkey, bkey = jax.random.split(rng, 3)
 w = jax.random.normal(wkey, (2, 1))
 b = jax.random.normal(bkey, (1,))
 
-w, b = train(w, b, x, y)
+# five epochs is where this dataset reaches 100% accuracy, one is not enough
+w, b = train(w, b, x, y, epochs=5)
+
+accuracy = (perceptron(w, b, x).squeeze() == y).mean()  # 1.0
 ```
 
 The JAX specific pieces, `jax.random.key` and the explicit key splitting, are covered in the [JAX section](#jax) below. The full notebook, including the plotting and animation code, is available [here](/assets/notebooks/perceptron.ipynb).
 
-+show a slider with animation so each example step and nudge can be visualized+
+<figure>
+<img src="/assets/img/perceptron-training.gif" alt="Animation of perceptron training: the decision line starts at a random angle and is nudged step by step until it separates the red and blue point clouds">
+<figcaption>Each misclassified point nudges the line, equation (5) in motion over five epochs of training.</figcaption>
+</figure>
 
 Take a moment to appreciate that from a simple loop in Python and some datapoints emerges spatial reasoning capability, in the feature dimensions, in a deterministic digital machine. The New York Times called this the "embryo of an electronic computer" at the time[^nyt].
-+insert image of nyt snippet+
+<figure style="max-width: 240px; margin: 0 auto;">
+<img src="/assets/img/nyt-perceptron-1958.png" alt="New York Times clipping from July 8, 1958, headlined 'New Navy Device Learns By Doing: Psychologist Shows Embryo of Computer Designed to Read and Grow Wiser', reporting Frank Rosenblatt's perceptron demonstration">
+<figcaption>The New York Times,<br/> July 8, 1958.</figcaption>
+</figure>
 
 It is evident from equation (2) that this network is capable of capturing (learning to represent) a linear relationship between the inputs and outputs. Most real world problems do not fit into this constraint. Marvin Minsky, interestingly a schoolmate of Rosenblatt[^bronx], along with Seymour Papert proved this limitation in their 1969 book *Perceptrons*[^minsky], showing a single layer perceptron cannot solve problems that are not linearly separable (the XOR gate being the canonical example), which led to the first of the AI winters in history.
 
@@ -288,8 +300,87 @@ Both frameworks take care of the two genuinely tedious parts of deep learning, c
 </div>
 
 #### Implementation and Training
-+show one perceptron and then make it multi layer+
-+two moons dataset for training example in JAX+
+
+The single perceptron grows into a multilayer network with surprisingly little new code. First we need a dataset that defeats a straight line; two interleaved half moons are the classic choice.
+
+```python
+# two interleaved half circles, a dataset no straight line can separate
+def make_moons(key, n_per_class=500, noise=0.1):
+  kt0, kt1, knoise, kshuffle = jax.random.split(key, 4)
+  t0 = jax.random.uniform(kt0, (n_per_class,)) * jnp.pi
+  t1 = jax.random.uniform(kt1, (n_per_class,)) * jnp.pi
+  moon0 = jnp.stack([jnp.cos(t0), jnp.sin(t0)], axis=1)
+  moon1 = jnp.stack([1.0 - jnp.cos(t1), 0.5 - jnp.sin(t1)], axis=1)
+  x = jnp.vstack([moon0, moon1])
+  x = x + noise * jax.random.normal(knoise, x.shape)
+  y = jnp.concatenate([jnp.zeros(n_per_class), jnp.ones(n_per_class)])
+  indices = jax.random.permutation(kshuffle, jnp.arange(x.shape[0]))
+  return x[indices], y[indices]
+```
+
+Two changes turn the perceptron into a multilayer network. The step function gives way to smooth activations so that gradients can flow through every layer, and the single $(w, b)$ pair grows into a list of them, one per layer. The forward pass stacks the same `layer()` function we wrote for the perceptron.
+
+```python
+# smooth activations replace the step function so gradients can flow through them
+def relu(z):
+  return jnp.maximum(0.0, z)
+
+def sigmoid(z):
+  return 1.0 / (1.0 + jnp.exp(-z))
+
+# one (w, b) pair per layer: sizes [2, 16, 16, 1] means 2 inputs,
+# two hidden layers of 16 neurons each, and 1 output neuron
+def init_mlp(key, sizes):
+  params = []
+  for n_in, n_out in zip(sizes[:-1], sizes[1:]):
+    key, wkey = jax.random.split(key)
+    params.append({'w': jax.random.normal(wkey, (n_in, n_out)) * jnp.sqrt(2.0 / n_in),
+                   'b': jnp.zeros(n_out)})
+  return params
+
+# forward pass: the same layer() as the perceptron, stacked, with relu between
+# hidden layers and a sigmoid squashing the output into (0, 1)
+def mlp(params, x):
+  h = x
+  for p in params[:-1]:
+    h = relu(layer(p['w'], p['b'], h))
+  return sigmoid(layer(params[-1]['w'], params[-1]['b'], h)).squeeze()
+```
+
+The loss is the averaged squared error discussed above, written as a pure function of the parameters. That purity is what lets `jax.grad` differentiate it: the returned function computes the partial derivative of the loss with respect to every weight and bias in the network, backpropagation without writing a single derivative by hand. JAX calls the nested list of parameter dictionaries a pytree, and `jax.tree.map` applies the same update rule to every leaf in it at once.
+
+```python
+# squared error averaged over the dataset: smooth and differentiable everywhere,
+# a pure function of the parameters so jax can differentiate it
+def mse(params, x, y):
+  return ((mlp(params, x) - y) ** 2).mean()
+
+# jax.grad returns d(loss)/d(parameter) for every parameter in the pytree,
+# backpropagation without writing a single derivative by hand
+def train_mlp(params, x, y, lr=0.5, epochs=1000):
+  grad_fn = jax.grad(mse)
+  for epoch in range(epochs):
+    grads = grad_fn(params, x, y)
+    params = jax.tree.map(lambda p, g: p - lr * g, params, grads)
+  return params
+```
+
+A thousand epochs of training reach 99.9% accuracy on the moons.
+
+```python
+rng, dkey, pkey = jax.random.split(rng, 3)
+x_moons, y_moons = make_moons(dkey)
+
+params = init_mlp(pkey, [2, 16, 16, 1])
+params = train_mlp(params, x_moons, y_moons)
+
+accuracy = ((mlp(params, x_moons) > 0.5) == y_moons).mean()  # 0.999
+```
+
+<figure>
+<img src="/assets/img/mlp-training.gif" alt="Animation of MLP training on the two moons dataset: the decision boundary starts as a rough diagonal and gradually bends into a curve that wraps around both half moons">
+<figcaption>The decision boundary bending around the moons as training progresses, a curve no single perceptron could draw.</figcaption>
+</figure>
 
 ### Conclusion
 

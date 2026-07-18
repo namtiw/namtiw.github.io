@@ -28,7 +28,7 @@ flowchart LR
   end
 </pre>
 
-The next few posts document my pedagogical exercise of building a decoder only Transformer network from scratch[^karpathy]. The aim is to develop an intuitive understanding of the architecture most modern LLMs use and implement it from scratch in JAX, to reason about how massive models are designed piece by piece and what the learning process looks like for these networks. ***Intended as my notes for ML concepts, starting from basic math and computer science principles.*** To follow along, a basic understanding of linear algebra (matrix multiplication), calculus (gradients and partial derivatives), and Python programming is a prerequisite; no prior knowledge of machine learning is required.
+The next few posts are my working notes from building a decoder only Transformer in JAX[^karpathy]. I am not writing as an expert; these posts exist because implementing something from scratch is how I understand it, and this series is the record of that pedagogical exercise. The goal is to implement the architecture behind most modern LLMs starting from basic math and computer science principles, and along the way reason about how these networks are designed and what learning actually looks like inside them. To follow along, a basic understanding of linear algebra (matrix multiplication), calculus (gradients and partial derivatives), and Python programming is a prerequisite; no prior knowledge of machine learning is required.
 
 <div class="collapsiblecontainer">
 <div class="collapsibleheader"><span>+ </span>A note on terminology: model, network, LLM</div>

@@ -54,7 +54,7 @@ The design borrowed loosely from biology: a neuron collects signals through its 
 
 #### Problem statement
 
-In order to motivate this topic, imagine developing a (traditional, deterministic) program to solve a classification problem of Shakespearean plays into Comedy and Not Comedy. For our purposes, assume we have a dataset with true/false binary labels for each work. A viable approach, rooted in familiarity with his work, is to check if the story [ends with at least one wedding](https://www.bellshakespeare.com.au/genres-of-shakespeares-plays). Given the volume of Shakespearean work it is expected this strategy only gives correct output for a small subset of all available examples. Making the strategy slightly more competent, let's add: if no main character dies, it is a comedy. It is evident that solving this problem with respectable levels of accuracy spanning all of Shakespeare's works will require a rigorous analysis of the dataset to discover emerging themes and develop corresponding rules.
+To ground this in a concrete problem, imagine developing a (traditional, deterministic) program to solve a classification problem of Shakespearean plays into Comedy and Not Comedy. For our purposes, assume we have a dataset with true/false binary labels for each work. A viable approach, rooted in familiarity with his work, is to check if the story [ends with at least one wedding](https://www.bellshakespeare.com.au/genres-of-shakespeares-plays). Given the volume of Shakespearean work it is expected this strategy only gives correct output for a small subset of all available examples. Making the strategy slightly more competent, let's add: if no main character dies, it is a comedy. Solving this problem with respectable accuracy across all of Shakespeare's works would require a rigorous analysis of the dataset to discover emerging themes and develop corresponding rules.
 
 Let's break this down into a simpler subproblem. Assume our data has two identified notable features (ending with a wedding, death of a character in our analogy) $x_1$ and $x_2$ that cleanly divide it into two classes. Mathematically, this can be represented as points in a two dimensional space with a clear boundary between two classes of points. Taking a geometry based shortcut to the solution, the general purpose [equation of a line](https://mathworld.wolfram.com/Line.html) in our two dimensional feature space is given by
 
@@ -71,7 +71,7 @@ The variable names are chosen intentionally to tie into ML naming conventions.
 
 #### The architecture
 
-The original [photoperceptron](https://com-cog-book.github.io/com-cog-book/features/perceptron.html) developed by Rosenblatt drew interesting inspirations from biology; we discuss a slight variation that is today most widely recognised as the Perceptron.
+The original [photoperceptron](https://com-cog-book.github.io/com-cog-book/features/perceptron.html) developed by Rosenblatt drew interesting inspirations from biology; this post covers a slight variation that is today most widely recognised as the Perceptron.
 
 The notion of a linear function that outputs the class of a 2d point can be represented as a network of mathematical operations on the input coordinates.
 
@@ -93,7 +93,7 @@ $$f(z) = \begin{cases} 1 & \text{if } z \geq T \\ 0 & \text{if } z < T \end{case
 The step function helps translate the continuous output of the linear function into discrete values which can be interpreted as classes. Note that the threshold $T$ is redundant given the bias: rewriting $z \geq T$ as $z - T \geq 0$ folds $T$ into $b$, so by convention the threshold is set to $0$.
 Intuitively, this can be thought of as a weighted sum of features that govern a dataset. In the Shakespearean analogy, a wedding finale contributes differently to a particular work being a comedy than the death of a protagonist, and the combined effect must pass a certain threshold (step function) to qualify as a comedy.
 
-To make this concrete, let us run two plays through the network using an assumed set of parameters. The features are binary: $x_1 = 1$ if the story ends with a wedding, $x_2 = 1$ if a main character dies, and a comedy is encoded as $y = 1$. Assume the network has the weights $w_1 = 0.8$, $w_2 = -0.9$, the bias $b = 0.2$, and a threshold of $0$.
+To make this concrete, let's run two plays through the network using an assumed set of parameters. The features are binary: $x_1 = 1$ if the story ends with a wedding, $x_2 = 1$ if a main character dies, and a comedy is encoded as $y = 1$. Assume the network has the weights $w_1 = 0.8$, $w_2 = -0.9$, the bias $b = 0.2$, and a threshold of $0$.
 
 For *A Midsummer Night's Dream*, which ends in weddings and spares its main characters, the input is $(x_1 = 1, x_2 = 0)$:
 
@@ -233,13 +233,13 @@ The JAX specific pieces, `jax.random.key` and the explicit key splitting, are co
 <figcaption>Each misclassified point nudges the line, equation (5) in motion over five epochs of training.</figcaption>
 </figure>
 
-Take a moment to appreciate that from a simple loop in Python and some datapoints emerges spatial reasoning capability, in the feature dimensions, in a deterministic digital machine. The New York Times called this the "embryo of an electronic computer" at the time[^nyt].
+What strikes me is that from a simple loop in Python and some datapoints emerges spatial reasoning capability, in the feature dimensions, in a deterministic digital machine. The New York Times called this the "embryo of an electronic computer" at the time[^nyt].
 <figure style="max-width: 240px; margin: 0 auto;">
 <img src="/assets/img/nyt-perceptron-1958.png" alt="New York Times clipping from July 8, 1958, headlined 'New Navy Device Learns By Doing: Psychologist Shows Embryo of Computer Designed to Read and Grow Wiser', reporting Frank Rosenblatt's perceptron demonstration">
 <figcaption>The New York Times,<br/> July 8, 1958.</figcaption>
 </figure>
 
-It is evident from equation (2) that this network is capable of capturing (learning to represent) a linear relationship between the inputs and outputs. Most real world problems do not fit into this constraint. Marvin Minsky, interestingly a schoolmate of Rosenblatt[^bronx], along with Seymour Papert proved this limitation in their 1969 book *Perceptrons*[^minsky], showing a single layer perceptron cannot solve problems that are not linearly separable (the XOR gate being the canonical example), which led to the first of the AI winters in history.
+The form of equation (2) means this network can only capture (learn to represent) a linear relationship between the inputs and outputs. Most real world problems do not fit into this constraint. Marvin Minsky, interestingly a schoolmate of Rosenblatt[^bronx], along with Seymour Papert proved this limitation in their 1969 book *Perceptrons*[^minsky], showing a single layer perceptron cannot solve problems that are not linearly separable (the XOR gate being the canonical example), which led to the first of the AI winters in history.
 
 Non-linearity in the network's representation is necessary to solve richer problems with it. In other words, real world problems often have a large number of features (think a higher dimensional feature space, instead of 2D) that affect the output, so the mathematical relation is a higher order function. A (surprisingly) straightforward avenue is adding more than one layer of the above matrix multiplications to the network.
 

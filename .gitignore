@@ -8,5 +8,7 @@ _site
 Thumbs.db
 ehthumbs.db
 
+.gitignore
+CLAUDE.md
 *.iml
 .idea/

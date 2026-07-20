@@ -91,3 +91,29 @@ pre.mermaid {
 .highlight .gd { color: #FF7B72; background-color: #2D1416; }            /* diff deleted */
 .highlight .gi { color: #7EE787; background-color: #11271A; }            /* diff inserted */
 .highlight .err { color: #FF7B72; background-color: transparent; }       /* errors */
+
+/* --- Wider content column on desktop --- */
+/* Theme layouts wrap post/page bodies in col-xl-8 offset-xl-2 (760px at xl)
+   and col-lg-10 offset-lg-1 (800px at lg). Collapse those to full width and
+   let the container max-width set the measure instead. Mobile is untouched:
+   all rules are min-width gated and the container is already fluid below md. */
+@media (min-width: 992px) {
+  main.container-md,
+  .intro-header .container-md,
+  .beautiful-jekyll-footer.container-md {
+    max-width: 900px;
+  }
+  main.container-md > .row > [class*="col-"] {
+    flex: 0 0 100%;
+    max-width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  main.container-md,
+  .intro-header .container-md,
+  .beautiful-jekyll-footer.container-md {
+    max-width: 1020px;
+  }
+}

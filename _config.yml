@@ -285,6 +285,7 @@ defaults:
 
 # Exclude these files from production site
 exclude:
+  - .venv/
   - CHANGELOG.md
   - CNAME
   - Gemfile

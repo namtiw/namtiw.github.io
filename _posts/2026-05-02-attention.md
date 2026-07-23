@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Implementing Attention in JAX
-subtitle: The atom 
+subtitle: How language models learn to look back
 thumbnail-img: /assets/img/ml.jpg
 mathjax: true
 mermaid: true
@@ -82,7 +82,7 @@ $$
 
 
 ### Recurrent Neural Networks
-A toy five word phrase surfaces the complexity of the translation problem, since it isn't a word by word lookup: consider `Attention is all you need` and its Spanish translation, `la atención es todo lo que necesitas`. The output is seven words long, and "all you need" has no single counterpart to line up against, it is spread across "todo lo que necesitas". The model must learn to accumulate context over the whole input and use it to predict the output. Recurrent neural network architecture encodes this context using hidden states: the network reads in one word's embedding at a time and folds it into a hidden state that summarizes everything seen so far. An embedding is a fixed vector for a word in isolation, while a hidden state is what that word means once combined with everything the network has read before it, an important distinction we'll lean on again shortly. The order in which words appear matters for any language task, and because the network reads them one at a time in sequence, that order is naturally preserved without any extra bookkeeping. Mathematically, the encoder's recurrence is:
+A toy five word phrase surfaces the complexity of the translation problem, since it isn't a word by word lookup: consider `Attention is all you need` and its Spanish translation, `la atención es todo lo que necesitas`. The output is seven words long, and "all you need" has no single counterpart to line up against, it is spread across "todo lo que necesitas". The model must learn to accumulate context over the whole input and use it to predict the output. Recurrent neural network architecture encodes this context using hidden states: the network reads in one word's embedding at a time and folds it into a hidden state that summarizes everything seen so far. An embedding is a fixed vector for a word in isolation, while a hidden state is what that word means once combined with everything the network has read before it, an important distinction we'll lean on again shortly. The order in which words appear matters for any language task, and because the network reads them one at a time in sequence, that order is naturally preserved. Mathematically, the encoder's recurrence is:
 
 $$h_i^{enc} = f\left(W_h h_{i-1}^{enc} + W_x x_i + b\right)$$
 
@@ -133,76 +133,192 @@ flowchart LR
 
 #### The encoder decoder architecture
 
-Architecturally, tying this to the introduction's neural network layout, this can be thought of encoder neurons with their weights, biases and activations <link to post 1 where this is discussed as inherent to neuron>, similar decoder neurons and a feedback loop that allows the network to use outputs from layers as input to previous layers at next time step. Note, in the diagram below the architecture is unrolled over time and shows how an input flows through the network. Each $f$ in the mathematical representation above can be considered as a network primitive shown above with its own learnable weights, biases and activations to learn complex non linear relationships between its inputs and outputs.
-The hidden states are then used to construct the context. The decoder part of the network uses the last hidden state as $context$. That is, at the current time step $h_i$ is input to the decoder. give the formula for generating $y_i$ output from the query vector and context and the previous time step output.ss
+Architecturally, tying this back to the perceptrons from [the first post in this series]({% post_url 2026-04-07-MachineLearningBeginning %}), the encoder and decoder are each ordinary layers of neurons, complete with weights, biases, and activations, wired together with one addition: a feedback loop, where a layer's own hidden state at one time step becomes part of its input at the next. That loop is what lets one fixed set of weights process a variable-length sequence one token at a time, instead of needing a separate set of weights per position. The diagram below unrolls this loop over time, showing the same encoder and decoder weights reused at every step as the five-word English sentence is read in and the Spanish translation is read out.
 
-<!-- NOTE: encoder-decoder diagram unrolled over time, hidden states flowing, context vector highlighted as the bottleneck -->
+<figure>
+<pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 40, "rankSpacing": 70}}}%%
+flowchart LR
+  subgraph ENC["Encoder (same weights reused every step)"]
+    direction LR
+    X1["x₁"] --> H1(("h₁"))
+    X2["x₂"] --> H2(("h₂"))
+    X3["x₃"] --> H3(("h₃"))
+    X4["x₄"] --> H4(("h₄"))
+    X5["x₅"] --> H5(("h₅"))
+    H1 --> H2 --> H3 --> H4 --> H5
+  end
+  H5 -- "context" --> C(("c"))
+  subgraph DEC["Decoder (same weights reused every step)"]
+    direction LR
+    D1(("h₁")) --> D2(("h₂")) --> D3(("h₃")) --> D4(("h₄")) --> D5(("h₅"))
+    D1 --> Y1["y₁"]
+    D2 --> Y2["y₂"]
+    D3 --> Y3["y₃"]
+    D4 --> Y4["y₄"]
+    D5 --> Y5["y₅"]
+    Y1 -.-> D2
+    Y2 -.-> D3
+    Y3 -.-> D4
+    Y4 -.-> D5
+  end
+  C -.-> D1
+  C -.-> D2
+  C -.-> D3
+  C -.-> D4
+  C -.-> D5
+  classDef inp fill:#0C2A3F,stroke:#38BDF8
+  classDef outp fill:#3A1D24,stroke:#F87171
+  classDef focus fill:#3A2A0C,stroke:#F59E0B,stroke-width:2px
+  class X1,X2,X3,X4,X5 inp
+  class Y1,Y2,Y3,Y4,Y5 outp
+  class C focus
+  linkStyle default stroke:#475569,stroke-width:1px
+  linkStyle 0,1,2,3,4 stroke:#38BDF8,stroke-width:1.5px
+  linkStyle 9 stroke:#F59E0B,stroke-width:2px
+  linkStyle 23,24,25,26,27 stroke:#F59E0B,stroke-width:2px
+</pre>
+<figcaption>The encoder and decoder each reuse one fixed set of weights at every time step, the feedback loop from the recurrence above, unrolled here in time. Everything the network knows about the input has to funnel through the single context vector <em>c</em>, a bottleneck the next section addresses.</figcaption>
+</figure>
 
 #### The bottleneck
 
-This architecture has two limitations. The network has a high number of parameters to learn but it is not sequential in nature and only processes one token (think word of a sentence) at a time. which makes training a computationally expensive process memory constraints limit batching across examples. Also, the fixed context length limits the look back capability of the network to only a certain number of tokens hence, semantic context will be lost as the size of the input and output scale. Concretely, this idea of context being lost is the exploding gradient problem. Training the network using gradient descent implies weight matrices ($W_h$) are updated at each time step and with each multiplication operation with input vector the numerical values in these matrices grows to a large number (could be positive or negative depending on the data). As these values become larger, gradient descent, instead of taking small steps towards a minima applies large scale updates to the weights each time thus jumping around on the loss curve violently instead of settling. A knee jerk response could be to make the values in the matrix $< 1$ so multiplication brings numerical values down, although this runs into the vanishing gradient issue, wherein the weight values become so insignificantly small that gradient based updates have no effect on its values thus stalling the learning process. Chronolgically, these problems have been solved using architectures like LSTM (link out to a good resource on this) but, for our purposes we jump to `Attention`, currently regarded as the best solution to this problem.
+This architecture carries two separate limitations. First, it is sequential by construction: each hidden state depends on the one before it, so the network cannot process a whole sequence in parallel, only token by token, which makes both training and inference slow and hard to batch efficiently. Second, every input, however long, is compressed into one fixed-size context vector $c$. As the input grows, that vector has to represent more and more of it in the same amount of space, so semantic detail from early tokens gets diluted or lost by the time the decoder needs it.
 
-<!-- NOTE: show the diagram for the architecture showing neuron feedback loop and unrolled network clearly calling out the time axis -->
+A separate problem compounds the second: training the network with gradient descent runs backpropagation through every time step, repeatedly multiplying by the same weight matrix $W_h$. If the values in $W_h$ are larger than 1, this repeated multiplication makes gradients grow exponentially with sequence length, the exploding gradient problem, causing gradient descent to take wild, unstable steps instead of settling toward a minimum. The reflexive fix, shrinking the values in $W_h$ below 1, trades this for the opposite failure: gradients shrink exponentially instead, the vanishing gradient problem, and the earliest time steps stop receiving any meaningful update at all. Chronologically, architectures like LSTM[^lstm] were the first real fix for this. For our purposes, we jump straight to attention, currently the best solution to both the compute and long-range dependency problems.
+
 ### Attention
 
-The Attention primitive primarily solves the increasing computations problem and learning dependencies over long distances to maintain a richer context of input seen by the network. Instead of sequentially reading the input one token at a time, it is used entirely to generate a Attention matrix which captures the $context$ and then sequentially generate output using the previous output token and some hidden state. 
+Attention primarily targets the second limitation: it gives the decoder direct access to every encoder hidden state, not just the final one, so it can learn which parts of the input matter most for the word it's generating right now, instead of relying on everything being routed through one fixed context vector. The encoder here still reads the input sequentially, exactly as before, attention changes what the decoder can look at, not how the input is read.
 
 #### An aside, Softmax
-Softmax is a mathematical function often used in machine learning. In a nutshell, it takes in random scaled numerical value vectors and converts them to a probability distribution, ie, the output has two special characteristics all values are $< 1$ and they sum to 1. The internals of softmax are inconsequential here, a key takeaway is this operation proves to be really uses in converting outputs from an arbitrary output of a layer in a network into probability scores.  
+Softmax is a function that converts a vector of arbitrary real-valued scores into a probability distribution. For a vector $z$ of length $n$:
 
-<!-- NOTE: first appearance of softmax in the series, define properly: equation, all positive, sums to one, weighted average interpretation -->
+$$\text{softmax}(z)_i = \frac{e^{z_i}}{\sum_{j=1}^n e^{z_j}}$$
 
-As shown in the diagram below, generation of output $y_4$ uses the context $c$ generated using entire input sequence alongwith some hidden states. Poke at each one at a time. Starting with the alignment scores, hidden state $s_0$ and dot products of $h_i$s give matrix of scores which can be thought of as the alignment of the vectors $h_i$s with the networks hidden state. These alignment scores are then passed through a softmax to get attention weights. The attention weights are then scaled by the initial hidden states $h_i$ and summed to get the final context to use for output generation.
-attention primitive is carved out from this neural network encoder decoder layout and it solves for the limited context problem by using hidden state of every input token until this time step to create context. Similar to RNNs, the query vector are used to calculate alignment scores which are then softmaxed to get attention score which are multiplied by values to scale which gives context.< add diagram to show the whole network. a diagram as heatmap of attention matrix what it will look like we will write code for it later>
-the context is then used along with the query state and previous output token to calculate next output token. This allows the network to look back at the entire input so far summarized in the context and use it to predict the output. Thus, the length of the context vector does not bottle neck the semantic meaning the network can capture.
+Two properties fall out of this: every output is strictly positive and less than 1 (each term is an exponential divided by a sum that includes itself), and all outputs sum to exactly 1. Together these make the output a valid probability distribution over the $n$ inputs. That's what makes softmax useful here: given a set of scores, it turns them into weights that can be used to compute a weighted average, the mechanism attention leans on directly, as the next section shows.
 
-<!-- NOTE: alignment score calculation, decide additive (Bahdanau) vs dot product simplification -->
+The fixed context $c$ handed to the decoder is one snapshot, frozen after the encoder finishes reading. But what the decoder needs from the input keeps changing across its own steps, generating "todo" leans on different words than generating "necesitas". So let the decoder search back over the encoder's hidden states itself, at every step, and build a context suited to that step alone.
 
+Comparing the decoder's current state against each encoder state gives a measure of relevance:
 
+$$e_{ij} = h_{i-1}^{dec} \cdot h_j^{enc}$$
+
+the dot product is large when the two vectors point in a similar direction, i.e. when encoder position $j$ is relevant to what the decoder is about to generate at step $i$. Normalizing these scores with softmax turns them into weights that sum to 1:
+
+$$\alpha_{ij} = \text{softmax}(e_{i1}, \dots, e_{i5})_j$$
+
+and the new context is a weighted sum of the encoder states, weighted exactly by how relevant each one is right now:
+
+$$c_i = \sum_{j=1}^5 \alpha_{ij} h_j^{enc}$$
+
+$c_i$ replaces the static $c$ in the decoder recurrence, $h_i^{dec} = f\left(W_h h_{i-1}^{dec} + W_y y_{i-1} + W_c c_i + b\right)$, recomputed fresh at every step instead of fixed once. That's how the network reaches across the whole input without squeezing it through one bottleneck.
 
 #### Carving attention out
-Attention can be carved out from the encoder-decoder layout shown above. The hidden states are called query, key and values which teases the intuition of how the model is able to the capture the context over large distances in a sequence.  Inputs/data vectors $x_i$ are projected into keys and values. Alignment scores are generated from the key and query dot products. Queries in this case, are independent matrices, learnable during training. The dot product as alluded to earlier, allows the network to capture the alignment of input to any queries that the network deemed relevant during training. The softmax alignment scores are then dotted with values to get Attention scores. The final attention matrix can be thought of as the network's representation of the entire input. This can be read as the weight the network assigns to each input when using it to generate the output, thus, the influence of each input dimension. For linguistic tasks, this enables the network to capture far away words in a sentence that affect the meaning of the entire phrase, for instance, understanding idioms requires the knowledge of the whole phrase and less about the individual words. 
-<!-- NOTE: walk one full step through the attention-augmented network BEFORE renaming anything, then the reveal: score-reweight-sum is a standalone primitive -->
-<!-- NOTE: cross attention FIRST (queries from decoder, keys/values from encoder side), self attention comes later by making queries depend on x too -->
+This search, compare, then blend mechanism is useful enough to name and carve out as a standalone primitive, independent of the RNN it lives inside here. The vector doing the searching, $h_{i-1}^{dec}$, is a query. The vectors being searched against, $h_j^{enc}$, are keys; the vectors being summed are values. Here keys and values are the same encoder hidden states, the next section projects them independently instead. For linguistic tasks, this is what lets the network capture far-away dependencies, idioms are the clearest example, understanding one often depends on the whole phrase rather than any single word in it.
 
 #### Queries, keys and values
 
-<!-- NOTE: from query and data vector, project the data vector to key and value using learnable parameters ensure everything is covered above well -->
-<!-- NOTE: batch into Q, K, V matrices; diagram and equations for these new operations -->
-<!-- NOTE: intuition of searching the space with queries, finding alignment, collecting values -->
-<!-- NOTE: callout - intuition only, in practice these are learnable weights and everything is differentiable so gradient descent learns them -->
+In the walkthrough above, queries, keys, and values were the raw hidden states themselves, $h_{i-1}^{dec}$ doubling as the query, $h_j^{enc}$ doubling as both key and value. In practice each role gets its own learned projection: three weight matrices $W_Q$, $W_K$, $W_V$ map the underlying vectors into a query space, a key space, and a value space, so the network can learn what to search for and what to search on separately, instead of reusing one vector for every role.
+
+$$q_i = W_Q h_i, \qquad k_j = W_K h_j, \qquad v_j = W_V h_j$$
+
+These weights are learnable, exactly like any other weight matrix in the network, trained by gradient descent alongside everything else. There's nothing hand-designed about what a query or key ends up representing, the search-match-collect intuition is a way to reason about the role each projection plays, not a constraint imposed on it.
+
+Computing one query, key, and value at a time is wasteful once there are many positions to process, so in practice the hidden states are stacked into a matrix $H \in \mathbb{R}^{n \times d}$, one row per position, and projected all at once:
+
+$$Q = HW_Q, \qquad K = HW_K, \qquad V = HW_V$$
+
+<figure>
+<pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 50, "rankSpacing": 70}}}%%
+flowchart LR
+  H["H<br/>(n × d)<br/>stacked hidden states"] -- "× W_Q" --> Q["Q<br/>(n × d_k)"]
+  H -- "× W_K" --> K["K<br/>(n × d_k)"]
+  H -- "× W_V" --> V["V<br/>(n × d_v)"]
+  classDef inp fill:#0C2A3F,stroke:#38BDF8
+  classDef outp fill:#3A1D24,stroke:#F87171
+  class H inp
+  class Q,K,V outp
+  linkStyle default stroke:#475569,stroke-width:1.5px
+</pre>
+<figcaption>The stacked hidden states $H$ are projected through three independent, learnable weight matrices to produce the query, key, and value matrices.</figcaption>
+</figure>
 
 #### Scaled dot product attention
 
-<!-- NOTE: do this in next post when we actually develop the transformer architecture and explain why the paper does it why scale by sqrt(d_k): large dot products push softmax into flat regions, gradients die -->
-<!-- NOTE: collapsible on the vanishing gradient problem and why it happens; distinguish from the deep-stack vanishing gradients saved for post 4 -->
+The dot products above grow with the dimensionality of the query and key vectors, and large dot products push softmax into regions where its gradient is nearly zero, stalling training. The fix is a scaling factor, dividing each score by $\sqrt{d_k}$ before the softmax. It's a small change with real consequences for training deep, stacked attention layers, covered in the next post once the full transformer block is assembled.
 
 #### Self-attention
-It is a slight variation in the architecture above wherein, queries are also calculated using projections of the data values. <show the new diagram>
+So far attention has connected two separate sequences, cross-attention: queries came from the decoder's hidden state, keys and values from the encoder's. Self-attention is the same score-then-blend mechanism, but every projection reads from the same sequence, so a sequence attends to itself instead of to some other sequence.
 
-<!-- NOTE: convert queries to depend on x as well, introduce their parameters; input alone now generates queries, keys, values -->
-<!-- NOTE: softmax over the score matrix gives the attention matrix -->
-<!-- NOTE: visualize attention heatmap for an example to see correlation learnt, code for it in the implementation section -->
+$$q_i = W_Q x_i, \qquad k_i = W_K x_i, \qquad v_i = W_V x_i$$
+
+There's no encoder feeding a separate decoder anymore, one sequence generates all three roles from itself, then attends across its own positions to build a representation that already accounts for the rest of the sentence. This is the mechanism the rest of the series builds on: no recurrence is needed to accumulate context, every position can see every other position directly, in one step.
+
+<figure>
+<pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 120}}}%%
+flowchart LR
+  subgraph Q["as queries"]
+    direction TB
+    QX1["x₁"]
+    QX2["x₂"]
+    QX3["x₃"]
+    QX4["x₄"]
+  end
+  subgraph K["as keys / values"]
+    direction TB
+    KX1["x₁"]
+    KX2["x₂"]
+    KX3["x₃"]
+    KX4["x₄"]
+  end
+  QX1 --> KX1 & KX2 & KX3 & KX4
+  QX2 --> KX1 & KX2 & KX3 & KX4
+  QX3 --> KX1 & KX2 & KX3 & KX4
+  QX4 --> KX1 & KX2 & KX3 & KX4
+  classDef inp fill:#0C2A3F,stroke:#38BDF8
+  class QX1,QX2,QX3,QX4,KX1,KX2,KX3,KX4 inp
+  linkStyle default stroke:#475569,stroke-width:1px
+</pre>
+<figcaption>In self-attention, the same input sequence plays both roles: every token, as a query, attends to every token, including itself, as a key/value. There's no separate encoder feeding this, and no recurrence, every pairwise interaction happens in one step.</figcaption>
+</figure>
 
 ### Multi-head attention
-convs2s, bytenet all solve for the sequential computational bottleneck that attention does and try to keep context over long sequences. Attention, reduces the number of operations at the cost of some loss in resolution of captured context due to averaging of weights. This can be resolved by multi head attention.
+A single attention head compresses everything into one weighted average: for a given query, it collapses all its relevance judgments about the rest of the sequence into one context vector. That's a problem when a token has more than one kind of relationship to track, in "the dog chased the cat because it was hungry," resolving "it" depends on tracking both which noun it could refer to and the causal structure of the sentence, relationships a single softmax-weighted average tends to blend together rather than represent cleanly.
+
+Multi-head attention runs several attention computations in parallel, each with its own learned projections $W_Q^{(k)}, W_K^{(k)}, W_V^{(k)}$, so each head is free to specialize in a different kind of relationship. The outputs are concatenated and projected back down to the model's working dimension:
+
+$$\text{head}_k = \text{Attention}(XW_Q^{(k)}, XW_K^{(k)}, XW_V^{(k)}), \qquad \text{MultiHead}(X) = \text{Concat}(\text{head}_1, \dots, \text{head}_h)W_O$$
+
+Convolutional architectures like ConvS2S[^convs2s] and ByteNet[^bytenet] chase the same goal, cutting the number of sequential operations needed to relate two positions in a sequence, using stacked convolutions instead of recurrence. Multi-head attention gets there differently: it keeps attention's constant number of sequential operations per layer, and recovers the resolution lost to averaging by running several heads side by side instead of one.
 
 ### Masked attention
-<!-- NOTE:we will explain this in the next article when it becomes relevant for encoding sentences -->
+Everything so far assumes every position can see every other position. That's fine for reading a complete input, but breaks generation: predicting the next token can't be allowed to peek at tokens that come after it. Masking enforces this by blocking out future positions before the softmax, covered in the next post once we're generating autoregressively.
 
 ### Implementing attention in JAX
 
-then we will impelement a layer of attention in codek
+With the pieces above in place, here's a minimal, unscaled, unmasked self-attention layer in JAX, operating on one hand-crafted sequence so every intermediate matrix stays small enough to inspect directly. Scaling and masking are covered once the transformer block is assembled in the next post.
 
-<!-- NOTE: hand-crafted small vectors so every matrix is inspectable; companion notebook; decide whether jax.vmap (blueprint) is in or out -->
+<!-- TODO: code block, single-sequence single-head unscaled/unmasked attention, matches companion notebook -->
+
+<!-- TODO: attention-matrix heatmap for this example, computed in the notebook -->
+
+The full notebook is available <!-- TODO: link once notebook exists -->.
 
 ### Where this leads
 
-Attention is all you need paper tells us that just the attention values passed to a mlp and a network using this gives sota performance bleu scores<write this better> that whole arch is transformer next lecture. <!-- next post starts with transformer and then moves on to decoder only after explaining why and then implements it-->
-A major takeaway is how attention solves for computational constraints allowing training deep networks (high number of hidden layers) at scale while solving the context capturing problem between far away neighbors in a sequence. Hence, the success they have recently seen, know that at their core it is just matrix multiplications and the emergent properties can be attributed to the large amounts of curated data for training, the architecture design and the ingenuity that goes into training these models at scale.
+Vaswani et al. (2017)[^vaswani] showed that attention alone, stacked with simple feed-forward layers and no recurrence at all, reaches state-of-the-art translation quality, measured in BLEU score, a standard machine-translation metric. That architecture is the transformer, the subject of the next post. <!-- next post starts with transformer and then moves on to decoder only after explaining why and then implements it-->
+
+The takeaway from this post is narrower than that: attention removes the fixed-context bottleneck, and because self-attention needs no recurrence, it lets a sequence be processed in parallel instead of one token at a time. That parallelism is what makes training at the scale modern language models run at even feasible; training genuinely deep stacks of these layers is a separate problem, solved with residual connections and normalization, covered once the full transformer block is assembled. What follows from here, the fluency and apparent reasoning of large language models, comes from stacking this simple primitive, matrix multiplications and softmax, at scale, trained on enormous amounts of curated data, not from any single new mechanical trick.
 
 [^lecun]: LeCun, Y., Boser, B., Denker, J. S., Henderson, D., Howard, R. E., Hubbard, W., & Jackel, L. D. (1989). *Backpropagation Applied to Handwritten Zip Code Recognition.* Neural Computation, 1(4), 541-551.
 [^he]: He, K., Zhang, X., Ren, S., & Sun, J. (2015). *Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification.* IEEE International Conference on Computer Vision (ICCV).
 [^bengio]: Bengio, Y., Ducharme, R., Vincent, P., & Jauvin, C. (2003). *A Neural Probabilistic Language Model.* Journal of Machine Learning Research, 3, 1137-1155.
+[^lstm]: Hochreiter, S., & Schmidhuber, J. (1997). *Long Short-Term Memory.* Neural Computation, 9(8), 1735-1780.
+[^convs2s]: Gehring, J., Auli, M., Grangier, D., Yarats, D., & Dauphin, Y. N. (2017). *Convolutional Sequence to Sequence Learning.* Proceedings of the 34th International Conference on Machine Learning (ICML).
+[^bytenet]: Kalchbrenner, N., Espeholt, L., Simonyan, K., Oord, A. van den, Graves, A., & Kavukcuoglu, K. (2016). *Neural Machine Translation in Linear Time.* arXiv:1610.10099.
+[^vaswani]: Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). *Attention Is All You Need.* Advances in Neural Information Processing Systems (NeurIPS).
 
 

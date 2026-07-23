@@ -90,7 +90,7 @@ It helps to zoom into a single decoder step to see exactly how an output word ge
 
 $$h_i^{dec} = f\left(W_h h_{i-1}^{dec} + W_y y_{i-1} + W_c c + b\right), \qquad y_i = g\left(h_i^{dec}\right)$$
 
-the decoder computes a new hidden state $h_4^{dec}$ from its previous hidden state $h_3^{dec}$, the previous output token $y_3$ ("es"), and the context $c$, then reads the next word $y_4$ off of that hidden state. The same context $c$ is reused, unchanged, at every single decoder step, no matter how long the output gets, a limitation the next section digs into. The mechanics of translating words into vectors ($x_i$, $y_i$) and reading a word back out of a hidden state ($g$) are deliberately handwaved here; they're covered properly in a later post on embeddings and output projections.
+the decoder computes a new hidden state $h_4^{dec}$ from its previous hidden state $h_3^{dec}$, the previous output token $y_3$ ("es"), and the context $c$, then reads the next word $y_4$ off of that hidden state. The same context $c$ is reused, unchanged, at every single decoder step, no matter the length of the output. The mechanics of translating words into vectors ($x_i$, $y_i$) and reading a word back out of a hidden state ($g$) are deliberately handwaved here; they're covered properly in a later post on embeddings and output projections.
 
 <figure>
 <pre class="mermaid">
@@ -183,13 +183,13 @@ flowchart LR
 
 #### The bottleneck
 
-This architecture carries two separate limitations. First, it is sequential by construction: each hidden state depends on the one before it, so the network cannot process a whole sequence in parallel, only token by token, which makes both training and inference slow and hard to batch efficiently. Second, every input, however long, is compressed into one fixed-size context vector $c$. As the input grows, that vector has to represent more and more of it in the same amount of space, so semantic detail from early tokens gets diluted or lost by the time the decoder needs it.
+This architecture has two noteworthy limitations. First, it is sequential by construction: each hidden state depends on the one before it, so the network cannot process a whole sequence in parallel, only token by token, which makes both training and inference slow and hard to batch efficiently. Second, every input, however long, is compressed into one fixed-size context vector $c$. As the input grows, that vector has to represent more and more of it in the same amount of space, so semantic detail from early tokens gets diluted or lost by the time the decoder needs it.
 
-A separate problem compounds the second: training the network with gradient descent runs backpropagation through every time step, repeatedly multiplying by the same weight matrix $W_h$. If the values in $W_h$ are larger than 1, this repeated multiplication makes gradients grow exponentially with sequence length, the exploding gradient problem, causing gradient descent to take wild, unstable steps instead of settling toward a minimum. The reflexive fix, shrinking the values in $W_h$ below 1, trades this for the opposite failure: gradients shrink exponentially instead, the vanishing gradient problem, and the earliest time steps stop receiving any meaningful update at all. Chronologically, architectures like LSTM[^lstm] were the first real fix for this. For our purposes, we jump straight to attention, currently the best solution to both the compute and long-range dependency problems.
+The encoder-decoder layout of the RNN are assembled from all differentiable steps, hence it can be trained using gradient descent and learn parameters using backpropagation. The second limitation: training the network with gradient descent runs backpropagation through every time step, repeatedly multiplying by the same weight matrix $W_h$. If the values in $W_h$ are larger than 1, this repeated multiplication makes gradients grow exponentially with sequence length, the exploding gradient problem, causing gradient descent to take wild, unstable steps instead of settling toward a minimum.[^pascanu] A knee jerk fix is shrinking the values in $W_h$ below 1, which after a number of time steps leads the gradients shrink instead, the vanishing gradient problem, and the training stalls due to lack of meaningful updates. Chronologically, architectures like LSTM[^lstm] were the first real fix for this. For our purposes, we jump straight to attention, currently the best solution to both the compute and long-range dependency problems.
 
 ### Attention
 
-Attention primarily targets the second limitation: it gives the decoder direct access to every encoder hidden state, not just the final one, so it can learn which parts of the input matter most for the word it's generating right now, instead of relying on everything being routed through one fixed context vector. The encoder here still reads the input sequentially, exactly as before, attention changes what the decoder can look at, not how the input is read.
+The next logical step up, Attention, sandwiched in a encoder-decoder layout, primarily targets the second limitation: it gives the decoder direct access to every encoder hidden state, not just the final one, so it can learn which parts of the input matter most for the word it's generating right now, instead of relying on everything being routed through one fixed context vector. The encoder here still reads the input sequentially, exactly as before, attention changes what the decoder can look at, not how the input is read.
 
 #### An aside, Softmax
 Softmax is a function that converts a vector of arbitrary real-valued scores into a probability distribution. For a vector $z$ of length $n$:
@@ -198,7 +198,7 @@ $$\text{softmax}(z)_i = \frac{e^{z_i}}{\sum_{j=1}^n e^{z_j}}$$
 
 Two properties fall out of this: every output is strictly positive and less than 1 (each term is an exponential divided by a sum that includes itself), and all outputs sum to exactly 1. Together these make the output a valid probability distribution over the $n$ inputs. That's what makes softmax useful here: given a set of scores, it turns them into weights that can be used to compute a weighted average, the mechanism attention leans on directly, as the next section shows.
 
-The fixed context $c$ handed to the decoder is one snapshot, frozen after the encoder finishes reading. But what the decoder needs from the input keeps changing across its own steps, generating "todo" leans on different words than generating "necesitas". So let the decoder search back over the encoder's hidden states itself, at every step, and build a context suited to that step alone.
+The fixed context $c$ handed to the decoder is one snapshot, frozen after the encoder finishes reading. But the decoder needs different context at different steps. For instance, generating "todo" leans on different words than generating "necesitas". So let the decoder search back over the encoder's hidden states itself, at every step, and build a context suited to that step alone.
 
 Comparing the decoder's current state against each encoder state gives a measure of relevance:
 
@@ -245,10 +245,6 @@ flowchart LR
 <figcaption>The stacked hidden states $H$ are projected through three independent, learnable weight matrices to produce the query, key, and value matrices.</figcaption>
 </figure>
 
-#### Scaled dot product attention
-
-The dot products above grow with the dimensionality of the query and key vectors, and large dot products push softmax into regions where its gradient is nearly zero, stalling training. The fix is a scaling factor, dividing each score by $\sqrt{d_k}$ before the softmax. It's a small change with real consequences for training deep, stacked attention layers, covered in the next post once the full transformer block is assembled.
-
 #### Self-attention
 So far attention has connected two separate sequences, cross-attention: queries came from the decoder's hidden state, keys and values from the encoder's. Self-attention is the same score-then-blend mechanism, but every projection reads from the same sequence, so a sequence attends to itself instead of to some other sequence.
 
@@ -285,18 +281,6 @@ flowchart LR
 <figcaption>In self-attention, the same input sequence plays both roles: every token, as a query, attends to every token, including itself, as a key/value. There's no separate encoder feeding this, and no recurrence, every pairwise interaction happens in one step.</figcaption>
 </figure>
 
-### Multi-head attention
-A single attention head compresses everything into one weighted average: for a given query, it collapses all its relevance judgments about the rest of the sequence into one context vector. That's a problem when a token has more than one kind of relationship to track, in "the dog chased the cat because it was hungry," resolving "it" depends on tracking both which noun it could refer to and the causal structure of the sentence, relationships a single softmax-weighted average tends to blend together rather than represent cleanly.
-
-Multi-head attention runs several attention computations in parallel, each with its own learned projections $W_Q^{(k)}, W_K^{(k)}, W_V^{(k)}$, so each head is free to specialize in a different kind of relationship. The outputs are concatenated and projected back down to the model's working dimension:
-
-$$\text{head}_k = \text{Attention}(XW_Q^{(k)}, XW_K^{(k)}, XW_V^{(k)}), \qquad \text{MultiHead}(X) = \text{Concat}(\text{head}_1, \dots, \text{head}_h)W_O$$
-
-Convolutional architectures like ConvS2S[^convs2s] and ByteNet[^bytenet] chase the same goal, cutting the number of sequential operations needed to relate two positions in a sequence, using stacked convolutions instead of recurrence. Multi-head attention gets there differently: it keeps attention's constant number of sequential operations per layer, and recovers the resolution lost to averaging by running several heads side by side instead of one.
-
-### Masked attention
-Everything so far assumes every position can see every other position. That's fine for reading a complete input, but breaks generation: predicting the next token can't be allowed to peek at tokens that come after it. Masking enforces this by blocking out future positions before the softmax, covered in the next post once we're generating autoregressively.
-
 ### Implementing attention in JAX
 
 With the pieces above in place, here's a minimal, unscaled, unmasked self-attention layer in JAX, operating on one hand-crafted sequence so every intermediate matrix stays small enough to inspect directly. Scaling and masking are covered once the transformer block is assembled in the next post.
@@ -313,12 +297,13 @@ Vaswani et al. (2017)[^vaswani] showed that attention alone, stacked with simple
 
 The takeaway from this post is narrower than that: attention removes the fixed-context bottleneck, and because self-attention needs no recurrence, it lets a sequence be processed in parallel instead of one token at a time. That parallelism is what makes training at the scale modern language models run at even feasible; training genuinely deep stacks of these layers is a separate problem, solved with residual connections and normalization, covered once the full transformer block is assembled. What follows from here, the fluency and apparent reasoning of large language models, comes from stacking this simple primitive, matrix multiplications and softmax, at scale, trained on enormous amounts of curated data, not from any single new mechanical trick.
 
-[^lecun]: LeCun, Y., Boser, B., Denker, J. S., Henderson, D., Howard, R. E., Hubbard, W., & Jackel, L. D. (1989). *Backpropagation Applied to Handwritten Zip Code Recognition.* Neural Computation, 1(4), 541-551.
-[^he]: He, K., Zhang, X., Ren, S., & Sun, J. (2015). *Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification.* IEEE International Conference on Computer Vision (ICCV).
-[^bengio]: Bengio, Y., Ducharme, R., Vincent, P., & Jauvin, C. (2003). *A Neural Probabilistic Language Model.* Journal of Machine Learning Research, 3, 1137-1155.
-[^lstm]: Hochreiter, S., & Schmidhuber, J. (1997). *Long Short-Term Memory.* Neural Computation, 9(8), 1735-1780.
-[^convs2s]: Gehring, J., Auli, M., Grangier, D., Yarats, D., & Dauphin, Y. N. (2017). *Convolutional Sequence to Sequence Learning.* Proceedings of the 34th International Conference on Machine Learning (ICML).
-[^bytenet]: Kalchbrenner, N., Espeholt, L., Simonyan, K., Oord, A. van den, Graves, A., & Kavukcuoglu, K. (2016). *Neural Machine Translation in Linear Time.* arXiv:1610.10099.
-[^vaswani]: Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). *Attention Is All You Need.* Advances in Neural Information Processing Systems (NeurIPS).
+#### References
+
+[^lecun]: LeCun, Y., Boser, B., Denker, J. S., Henderson, D., Howard, R. E., Hubbard, W., & Jackel, L. D. (1989). [*Backpropagation Applied to Handwritten Zip Code Recognition.*](https://direct.mit.edu/neco/article/1/4/541/5515/Backpropagation-Applied-to-Handwritten-Zip-Code) Neural Computation, 1(4), 541-551.
+[^he]: He, K., Zhang, X., Ren, S., & Sun, J. (2015). [*Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification.*](https://arxiv.org/abs/1502.01852) IEEE International Conference on Computer Vision (ICCV).
+[^bengio]: Bengio, Y., Ducharme, R., Vincent, P., & Jauvin, C. (2003). [*A Neural Probabilistic Language Model.*](https://www.jmlr.org/papers/v3/bengio03a.html) Journal of Machine Learning Research, 3, 1137-1155.
+[^pascanu]: Pascanu, R., Mikolov, T., & Bengio, Y. (2013). [*On the Difficulty of Training Recurrent Neural Networks.*](https://arxiv.org/abs/1211.5063) Proceedings of the 30th International Conference on Machine Learning (ICML).
+[^lstm]: Hochreiter, S., & Schmidhuber, J. (1997). [*Long Short-Term Memory.*](https://direct.mit.edu/neco/article/9/8/1735/6109/Long-Short-Term-Memory) Neural Computation, 9(8), 1735-1780. For a gentler walkthrough, see [Christopher Olah's *Understanding LSTM Networks*](https://colah.github.io/posts/2015-08-Understanding-LSTMs/).
+[^vaswani]: Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). [*Attention Is All You Need.*](https://arxiv.org/abs/1706.03762) Advances in Neural Information Processing Systems (NeurIPS). For a highly visual walkthrough of the resulting architecture, see [Jay Alammar's *The Illustrated Transformer*](https://jalammar.github.io/illustrated-transformer/).
 
 

@@ -93,17 +93,20 @@ pre.mermaid {
 .highlight .err { color: #FF7B72; background-color: transparent; }       /* errors */
 
 /* --- Wider content column on desktop --- */
-/* Theme layouts wrap post/page bodies in col-xl-8 offset-xl-2 (760px at xl)
-   and col-lg-10 offset-lg-1 (800px at lg). Collapse those to full width and
-   let the container max-width set the measure instead. Mobile is untouched:
-   all rules are min-width gated and the container is already fluid below md. */
+/* Theme layouts wrap post/page bodies AND the header title in col-xl-8
+   offset-xl-2 (760px at xl) and col-lg-10 offset-lg-1 (800px at lg).
+   Collapse those to full width and let the container max-width set the
+   measure instead, so the title lines up with the body text. Mobile is
+   untouched: all rules are min-width gated and the container is already
+   fluid below md. */
 @media (min-width: 992px) {
   main.container-md,
   .intro-header .container-md,
   .beautiful-jekyll-footer.container-md {
     max-width: 900px;
   }
-  main.container-md > .row > [class*="col-"] {
+  main.container-md > .row > [class*="col-"],
+  .intro-header .container-md > .row > [class*="col-"] {
     flex: 0 0 100%;
     max-width: 100%;
     margin-left: 0;

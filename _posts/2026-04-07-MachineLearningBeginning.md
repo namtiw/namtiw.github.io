@@ -386,11 +386,11 @@ accuracy = ((mlp(params, x_moons) > 0.5) == y_moons).mean()  # 0.999
 
 Given enough data and a capable model architecture, interesting emergent properties are observed from the training process: without explicit mention of two classes or a classification problem, the network trains to fit the dataset and becomes capable of classifying unseen inputs correctly (assuming the unseen input follows the same patterns). Some key takeaways from the exercise here are:
 - The number of features, the size of a network, and its architecture (how layers are structured and connected) dictate the nature of problems that it will be able to learn to solve with respectable accuracy.
-- Non linearities in the network are important to enable it to model complex real world problems.
+- Non-linearities in the network are important to enable it to model complex real world problems.
 - The training process is more hands off than the original Bard example. For instance, selecting sarcasm and puns as features is not required. However, a good understanding of the major features that relate inputs to outputs will aid in better architecture of the network. This highlights two main problems with training capable networks: availability of clean, ample datasets for the problem at hand, and understanding of the dataset to be able to architect a model conducive to training.
 - Since they are not explicitly encoded, the features a model identifies in a dataset as important (represented by higher weights assigned to the neuron) are non deterministic. In a sense, the model is a black box.
 - As models get deeper, the choice of architecture, activations, and loss function dictates the model's ability to follow the gradient smoothly to a minimum on the loss curve. Various strategies to increase the likelihood of this convergence using a reasonable amount of data have been developed over the years. More on these in later posts as we use each to improve the network and its training.
-+Anthropic discovering consciousness like properties in networks shows this black box nature and emergent properties, a sentence on this and a link out+
+Recent Anthropic research[^anthropic] found that Claude spontaneously develops a small internal workspace, a compact set of neural patterns that other parts of the network broadcast to and read from, structurally similar to Global Workspace Theory, a leading cognitive-science account of conscious access. Disabling it barely touches fluent, automatic processing, but multi-step reasoning collapses, evidence of the emergent properties from training neural network architectures without explicit programming of such rules.
 
 ### References
 
@@ -402,6 +402,7 @@ Given enough data and a capable model architecture, interesting emergent propert
 [^coldwar]: Rosenblatt's perceptron research at Cornell Aeronautical Laboratory was funded by the U.S. Office of Naval Research, which staged the July 1958 public demonstration. See Olazaran, M. (1996). [A Sociological Study of the Official History of the Perceptrons Controversy](https://doi.org/10.1177/030631296026003005). Social Studies of Science, 26(3), 611-659.
 [^novikoff]: Novikoff, A. B. (1962). On convergence proofs on perceptrons. Proceedings of the Symposium on the Mathematical Theory of Automata, 12, 615-622. Known as the perceptron convergence theorem.
 [^nyt]: [New Navy Device Learns By Doing](https://www.nytimes.com/1958/07/08/archives/new-navy-device-learns-by-doing-psychologist-shows-embryo-of.html). The New York Times, July 8, 1958.
+[^anthropic]: Anthropic. (2026). [A Global Workspace in Language Models](https://www.anthropic.com/research/global-workspace).
 [^bronx]: Both attended the Bronx High School of Science, one year apart. See [Frank Rosenblatt](https://en.wikipedia.org/wiki/Frank_Rosenblatt), Wikipedia.
 [^minsky]: Minsky, M., & Papert, S. (1969). *Perceptrons: An Introduction to Computational Geometry*. MIT Press.
 [^goodfellow]: Goodfellow, I., Bengio, Y., & Courville, A. (2016). [Deep Learning](https://www.deeplearningbook.org/). MIT Press. Chapters 6 and 8 cover loss functions and the optimization difficulties of deep models.

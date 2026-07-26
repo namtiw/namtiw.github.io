@@ -38,7 +38,7 @@ These posts use the terms *model*, *network*, and *LLM* somewhat interchangeably
 </div>
 </div>
 
-### Perceptron, the first learning machine
+## Perceptron, the first learning machine
 
 The Perceptron, introduced by Frank Rosenblatt in 1958[^rosenblatt], is a binary classifier. He developed an iterative learning algorithm which _trains_ the network on a set of datapoints such that, when given an unseen example, the network produces the expected result, eliminating the need to encode every possible example and its outcome[^cornell]. In fact, starting from an arbitrary initial state, the algorithm is guaranteed to eventually converge to a solution that classifies 100% of the examples correctly, given such a solution exists[^novikoff].
 
@@ -53,7 +53,7 @@ The design borrowed loosely from biology: a neuron collects signals through its 
 </div>
 </div>
 
-#### Problem statement
+### Problem statement
 
 To ground this in a concrete problem, imagine developing a (traditional, deterministic) program to solve a classification problem of Shakespearean plays into Comedy and Not Comedy. For our purposes, assume we have a dataset with true/false binary labels for each work. A viable approach, rooted in familiarity with his work, is to check if the story [ends with at least one wedding](https://www.bellshakespeare.com.au/genres-of-shakespeares-plays). Given the volume of Shakespearean work it is expected this strategy only gives correct output for a small subset of all available examples. Making the strategy slightly more competent, let's add: if no main character dies, it is a comedy. Solving this problem with respectable accuracy across all of Shakespeare's works would require a rigorous analysis of the dataset to discover emerging themes and develop corresponding rules.
 
@@ -393,7 +393,7 @@ Given enough data and a capable model architecture, interesting emergent propert
 - As models get deeper, the choice of architecture, activations, and loss function dictates the model's ability to follow the gradient smoothly to a minimum on the loss curve. Various strategies to increase the likelihood of this convergence using a reasonable amount of data have been developed over the years. More on these in later posts as we use each to improve the network and its training.
 Recent Anthropic research[^anthropic] found that Claude spontaneously develops a small internal workspace, a compact set of neural patterns that other parts of the network broadcast to and read from, structurally similar to Global Workspace Theory, a leading cognitive-science account of conscious access. Disabling it barely touches fluent, automatic processing, but multi-step reasoning collapses, evidence of the emergent properties from training neural network architectures without explicit programming of such rules.
 
-### References
+## References
 
 [^karpathy]: This series is heavily inspired by Andrej Karpathy's [Neural Networks: Zero to Hero](https://karpathy.ai/zero-to-hero.html) lecture series, which is worth watching in full. These posts document a similar journey, building a Transformer based model from scratch, but in JAX, with a different set of examples for intuition and a different final product.
 [^he]: He, K., Zhang, X., Ren, S., & Sun, J. (2015). [Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification](https://arxiv.org/abs/1502.01852). IEEE International Conference on Computer Vision (ICCV).

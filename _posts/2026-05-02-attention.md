@@ -12,39 +12,61 @@ All neural networks are built from the same primitive we saw in the [multilayer 
 
 <pre class="mermaid">
 %%{init: {"flowchart": {"nodeSpacing": 40, "rankSpacing": 90}}}%%
-flowchart TB
-  subgraph PRIM["Shared network primitive"]
+flowchart TB 
+  subgraph PRIM["Perceptron Primitive: f(Wx + b)"]
     direction LR
-    X1["x₁"] -- "w₁" --> S["Σ<br/>w₁x₁ + w₂x₂ + b"]
-    X2["x₂"] -- "w₂" --> S
-    S -- "z" --> F["activation<br/>f(z)"]
-    F --> Y["y"]
+    subgraph INP1["Inputs"]
+      X1["x₁"]
+      X2["x₂"]
+    end
+    SUM["Σ<br/>w₁x₁ + w₂x₂ + b"]
+    ACT["Activation<br/>f(z)"]
+    Y1["Output y"]
+
+    X1 -- "w₁" --> SUM
+    X2 -- "w₂" --> SUM
+    SUM --> ACT --> Y1
   end
-  subgraph NET["Copies of the primitive wired together: a neural network"]
+
+  subgraph NET["Network Topology: Wired Primitives"]
     direction LR
-    I1["x₁"] --> A1 & A2 & A3
-    I2["x₂"] --> A1 & A2 & A3
-    A1(("f")) --> B1 & B2
-    A2(("f")) --> B1 & B2
-    A3(("f")) --> B1 & B2
-    B1(("f")) --> O["y′"]
-    B2(("f")) --> O
+    subgraph INP2["Input Layer"]
+      I1["x₁"]
+      I2["x₂"]
+    end
+    subgraph HID["Hidden Layer"]
+      H1(("f"))
+      H2(("f"))
+      H3(("f"))
+    end
+    subgraph OUT["Output Layer"]
+      O1(("f"))
+      O2["y′"]
+    end
+
+    I1 --> H1 & H2 & H3
+    I2 --> H1 & H2 & H3
+    H1 & H2 & H3 --> O1 --> O2
   end
-  PRIM -. "each f circle is one copy of this unit" .-> A2
-  classDef focus stroke:#F59E0B,stroke-width:2px
-  class A2 focus
-  classDef inp fill:#0C2A3F,stroke:#38BDF8
-  classDef outp fill:#3A1D24,stroke:#F87171
-  class X1,X2,I1,I2 inp
-  class Y,O outp
-  linkStyle default stroke:#475569,stroke-width:1px
-  linkStyle 0,1,2,3 stroke:#38BDF8,stroke-width:1.5px
-  linkStyle 18 stroke:#F59E0B,stroke-width:2px
+
+  PRIM -. "Every node `f` is an instance of the primitive" .-> H2
+
+  classDef input fill:#0f172a,stroke:#38bdf8,stroke-width:1.5px,color:#f8fafc
+  classDef math fill:#1e293b,stroke:#a855f7,stroke-width:1.5px,color:#f8fafc
+  classDef active fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#ffffff
+  classDef focus fill:#7c2d12,stroke:#f97316,stroke-width:2px,color:#ffffff
+  classDef output fill:#4c0519,stroke:#f43f5e,stroke-width:1.5px,color:#f8fafc
+
+  class X1,X2,I1,I2 input
+  class SUM math
+  class ACT active
+  class H2 focus
+  class Y1,O2 output
 </pre>
 
-### Sequence to sequence generation
-Given an input sequence, the task is to generate another sequence satisfying some requirement. This spans an amazingly vast range of real world problems: text generation such as autocomplete, and video game frame generation, where a renderer predicts frames it hasn't actually computed from the ones that came before. For the purposes of this post, consider language translation: for a sentence in one language, generate the sequence of words that is its translation in another. Neural networks are graphs of weight matrices, and they work best on numerical representations of their inputs[^bengio]. The text sequence is therefore translated into numerical vectors in a high-dimensional space, namely embeddings. The process of generating these embeddings is discussed in a later post. In a nutshell, for each word in the vocabulary there is a corresponding $d$-dimensional vector representation of it, the same idea as the two features, a wedding ending or a character's death, that separated comedies from tragedies in the first post, just scaled up: instead of two hand-picked features, a word gets hundreds of learned ones, each capturing some aspect of its meaning or usage. These values are parameters of the network and are learnt during the training process.
+## Sequence to sequence generation
 
+Given an input sequence, the task is to generate another sequence satisfying some requirement. This spans an amazingly vast range of real world problems: text generation such as autocomplete, and video game frame generation, where a renderer predicts frames it hasn't actually computed from the ones that came before. For the purposes of this post, consider language translation: for a sentence in one language, generate the sequence of words that is its translation in another. Neural networks are graphs of weight matrices, and they work best on numerical representations of their inputs[^bengio]. The text sequence is therefore translated into numerical vectors in a high-dimensional space, namely embeddings. The process of generating these embeddings is discussed in a later post. In a nutshell, for each word in the vocabulary there is a corresponding $d$-dimensional vector representation of it, the same idea as the two features, a wedding ending or a character's death, that separated comedies from tragedies in the first post, just scaled up: instead of two hand-picked features, a word gets hundreds of learned ones, each capturing some aspect of its meaning or usage. These values are parameters of the network and are learnt during the training process.
 
 <figure markdown="1">
 
@@ -84,49 +106,57 @@ $$
 ### Recurrent Neural Networks
 A toy five word phrase surfaces the complexity of the translation problem, since it isn't a word by word lookup: consider `Attention is all you need` and its Spanish translation, `la atención es todo lo que necesitas`. The output is seven words long, and "all you need" has no single counterpart to line up against, it is spread across "todo lo que necesitas". The model must learn to accumulate context over the whole input and use it to predict the output. Recurrent neural network architecture encodes this context using hidden states: the network reads in one word's embedding at a time and folds it into a hidden state that summarizes everything seen so far. An embedding is a fixed vector for a word in isolation, while a hidden state is what that word means once combined with everything the network has read before it, an important distinction we'll lean on again shortly. The order in which words appear matters for any language task, and because the network reads them one at a time in sequence, that order is naturally preserved. Mathematically, the encoder's recurrence is:
 
-$$h_i^{enc} = f\left(W_h h_{i-1}^{enc} + W_x x_i + b\right)$$
+$$
+h_i^{enc} = f\left(W_h h_{i-1}^{enc} + W_x x_i + b\right)
+$$
 
 It helps to zoom into a single decoder step to see exactly how an output word gets generated. Say the encoder has finished reading all five English words and produced hidden states $h_1^{enc}, \dots, h_5^{enc}$; the final one, $h_5^{enc}$, becomes the context $c$ handed off to the decoder. Generating the fourth Spanish word, "todo", is decoder step $i = 4$:
 
-$$h_i^{dec} = f\left(W_h h_{i-1}^{dec} + W_y y_{i-1} + W_c c + b\right), \qquad y_i = g\left(h_i^{dec}\right)$$
+$$
+h_i^{dec} = f\left(W_h h_{i-1}^{dec} + W_y y_{i-1} + W_c c + b\right), \qquad y_i = g\left(h_i^{dec}\right)
+$$
 
 Each weight matrix specializes in one source of information, and all three are learned jointly during training: $W_h$ controls how much of the previous hidden state carries forward, $W_y$ controls how much weight the previous output word gets, and $W_c$ controls how much the broader context contributes. Concretely, the decoder computes a new hidden state $h_4^{dec}$ from its previous hidden state $h_3^{dec}$ (through $W_h$), the previous output token $y_3$ ("es") (through $W_y$), and the context $c$ (through $W_c$), then reads the next word $y_4$ off of that hidden state. The same context $c$ is reused, unchanged, at every single decoder step, no matter the length of the output. The mechanics of translating words into vectors ($x_i$, $y_i$) and reading a word back out of a hidden state ($g$) are deliberately handwaved here; they're covered properly in a later post on embeddings and output projections.
 
 <figure>
 <pre class="mermaid">
 %%{init: {"flowchart": {"nodeSpacing": 40, "rankSpacing": 70}}}%%
-flowchart LR
-  subgraph ENC["Encoder"]
+flowchart TB
+  subgraph ENC["Encoder Sequence (Processed)"]
     direction LR
-    X1["x₁"] --> H1E(("h₁"))
-    X2["x₂"] --> H2E(("h₂"))
-    X3["x₃"] --> H3E(("h₃"))
-    X4["x₄"] --> H4E(("h₄"))
-    X5["x₅"] --> H5E(("h₅"))
-    H1E --> H2E --> H3E --> H4E --> H5E
+    X1["x₁"] --> E1(("h₁"))
+    X2["x₂"] --> E2(("h₂"))
+    X3["x₃"] --> E3(("h₃"))
+    X4["x₄"] --> E4(("h₄"))
+    E1 --> E2 --> E3 --> E4
   end
-  H5E -- "context" --> C(("c"))
-  subgraph DEC["Decoder: generating y₄"]
+
+  E4 ==> C["Final hidden state h₄ᵉⁿᶜ as contexj to decoder"]
+
+  subgraph DEC["Decoder Step i=4 (Generating 'todo')"]
     direction LR
-    H1D(("h₁")) --> H2D(("h₂")) --> H3D(("h₃")) --> H4D(("h₄"))
-    Y1["y₁"] -.-> H2D
-    Y2["y₂"] -.-> H3D
-    Y3["y₃"] -.-> H4D
-    H4D --> Y4["y₄"]
+    D3(("h₃ᵈᵉᶜ<br/>(prev hidden)"))
+    D4(("h₄ᵈᵉᶜ<br/>(current state)"))
+    Y3["y₃ ('es')<br/>(prev token)"]
+    Y4["y₄ ('todo')<br/>(generated)"]
+
+    D3 -- "$$W_h$$" --> D4
+    Y3 -- "$$W_y$$" --> D4
+    D4 -- "g(h₄)" --> Y4
   end
-  C -.-> H1D
-  C -.-> H2D
-  C -.-> H3D
-  C -.-> H4D
-  classDef inp fill:#0C2A3F,stroke:#38BDF8
-  classDef outp fill:#3A1D24,stroke:#F87171
-  classDef focus fill:#3A2A0C,stroke:#F59E0B,stroke-width:2px
-  class X1,X2,X3,X4,X5,Y1,Y2,Y3 inp
-  class Y4 outp
-  class C focus
-  linkStyle default stroke:#475569,stroke-width:1px
-  linkStyle 0,1,2,3,4 stroke:#38BDF8,stroke-width:1.5px
-  linkStyle 9,17,18,19,20 stroke:#F59E0B,stroke-width:2px
+
+  C ==>|"$$W_c$$"| D4
+
+  %% Styling
+  classDef encNode fill:#0f172a,stroke:#38bdf8,stroke-width:1px,color:#f8fafc
+  classDef decNode fill:#1e1b4b,stroke:#818cf8,stroke-width:1.5px,color:#f8fafc
+  classDef context fill:#451a03,stroke:#f97316,stroke-width:2px,color:#fff
+  classDef outNode fill:#4c0519,stroke:#f43f5e,stroke-width:2px,color:#fff
+
+  class X1,X2,X3,X4,X5,E1,E2,E3,E4,E5 encNode
+  class D3,D4,Y3 decNode
+  class C context
+  class Y4 outNode
 </pre>
 <figcaption>The encoder folds the five English words into hidden states, ending in a single context vector <em>c</em>. The decoder reuses that same, unchanged context at every step to generate each Spanish word, shown here generating the fourth word, "todo".</figcaption>
 </figure>
@@ -136,50 +166,45 @@ flowchart LR
 Architecturally, tying this back to the perceptrons from [the first post in this series]({% post_url 2026-04-07-MachineLearningBeginning %}), the encoder and decoder are each ordinary layers of neurons, complete with weights, biases, and activations, wired together with one addition: a feedback loop, where a layer's own hidden state at one time step becomes part of its input at the next. That loop is what lets one fixed set of weights process a variable-length sequence one token at a time, instead of needing a separate set of weights per position. The diagram below unrolls this loop over time, showing the same encoder and decoder weights reused at every step as the five-word English sentence is read in and the Spanish translation is read out.
 
 <figure>
-<pre class="mermaid">
+<pre class="mermaid">{% raw %}
 %%{init: {"flowchart": {"nodeSpacing": 40, "rankSpacing": 70}}}%%
-flowchart LR
-  subgraph ENC["Encoder (same weights reused every step)"]
-    direction LR
-    X1["x₁"] --> H1(("h₁"))
-    X2["x₂"] --> H2(("h₂"))
-    X3["x₃"] --> H3(("h₃"))
-    X4["x₄"] --> H4(("h₄"))
-    X5["x₅"] --> H5(("h₅"))
-    H1 --> H2 --> H3 --> H4 --> H5
+flowchart TB
+  subgraph ENCODER ["Encoder Phase (Reading)"]
+      X1["x₁ (attention)<br/>t=1"] --> H1(("h₁<br/>(t=1)"))
+      X2["x₂ (is)<br/>t=2"] --> H2(("h₂<br/>(t=2)"))
+      
+      H1 -- "State updates" --> H2
   end
-  H5 -- "context" --> C(("c"))
-  subgraph DEC["Decoder (same weights reused every step)"]
-    direction LR
-    D1(("h₁")) --> D2(("h₂")) --> D3(("h₃")) --> D4(("h₄")) --> D5(("h₅"))
-    D1 --> Y1["y₁"]
-    D2 --> Y2["y₂"]
-    D3 --> Y3["y₃"]
-    D4 --> Y4["y₄"]
-    D5 --> Y5["y₅"]
-    Y1 -.-> D2
-    Y2 -.-> D3
-    Y3 -.-> D4
-    Y4 -.-> D5
+
+  H2 ==>|"State freezes"| C{{"Context Bottleneck (c)"}}
+
+  subgraph DECODER ["Decoder Phase (Generating)"]
+      D3(("h₃ᵈᵉᶜ<br/>(t=3)")) --> Y1["y₁ (la)<br/>(t=3)"]
+      D4(("h₄ᵈᵉᶜ<br/>(t=4)")) --> Y2["y₂ (atención)<br/>(t=4)"]
+      
+      D3 -- "State updates" --> D4
+      Y1 -. "Feedback" .-> D4
   end
-  C -.-> D1
-  C -.-> D2
-  C -.-> D3
-  C -.-> D4
-  C -.-> D5
-  classDef inp fill:#0C2A3F,stroke:#38BDF8
-  classDef outp fill:#3A1D24,stroke:#F87171
-  classDef focus fill:#3A2A0C,stroke:#F59E0B,stroke-width:2px
-  class X1,X2,X3,X4,X5 inp
-  class Y1,Y2,Y3,Y4,Y5 outp
-  class C focus
-  linkStyle default stroke:#475569,stroke-width:1px
-  linkStyle 0,1,2,3,4 stroke:#38BDF8,stroke-width:1.5px
-  linkStyle 9 stroke:#F59E0B,stroke-width:2px
-  linkStyle 23,24,25,26,27 stroke:#F59E0B,stroke-width:2px
-</pre>
-<figcaption>The encoder and decoder each reuse one fixed set of weights at every time step, the feedback loop from the recurrence above, unrolled here in time. Everything the network knows about the input has to funnel through the single context vector <em>c</em>, a bottleneck the next section addresses.</figcaption>
+
+  C ==>|"Read by every step"| D3
+  C ==>|"Read by every step"| D4
+
+  %% Styling
+  classDef input fill:#0f172a,stroke:#38bdf8,color:#f8fafc
+  classDef encNode fill:#1e293b,stroke:#818cf8,stroke-width:1.5px,color:#f8fafc
+  classDef bottleneck fill:#7c2d12,stroke:#f97316,stroke-width:3px,color:#fff
+  classDef decNode fill:#312e81,stroke:#a855f7,stroke-width:1.5px,color:#f8fafc
+  classDef output fill:#4c0519,stroke:#f43f5e,color:#f8fafc
+  
+  class X1,X2 input
+  class H1,H2 encNode
+  class C bottleneck
+  class D3,D4 decNode
+  class Y1,Y2 output
+{% endraw %}</pre>
+<figcaption>The encoder and decoder each reuse one fixed set of weights at every time step, the feedback loop from the recurrence above, unrolled here in time. Everything the network knows about the input has to funnel through the single context vector <em>c</em> .</figcaption>
 </figure>
+
 
 #### The bottleneck
 
@@ -190,7 +215,7 @@ The encoder-decoder layout of the RNN is assembled from all differentiable steps
 <div class="collapsiblecontainer">
 <div class="collapsibleheader"><span>+ </span>Exploding gradient problem</div>
 <div class="collapsiblecontent" markdown="1">
-When training neural networks using backpropagation, we use the chain rule to calculate how much a small change in an early layer's weights affects the final loss. For deep feedforward networks or recurrent neural networks (RNNs), this means the gradients of earlier weights are calculated using increasingly many multiplications by the layer's weight matrix (e.g., $W$ in an RNN) for every layer or time step. If the matrix operation inherently "stretches" the gradient vectors, this repeated multiplication causes the weight gradients at earlier layers to grow exponentially. The result is that the optimization algorithm takes massive, unstable steps that can introduce instability in the training process, slow it down, or halt it entirely.
+When training neural networks using backpropagation, we use the chain rule to calculate how much a small change in an early layer's weights affects the final loss. For deep feedforward networks (networks with many hidden layers) or recurrent neural networks (RNNs), this means the gradients of earlier weights are calculated using increasingly many multiplications by the layer's weight matrix (e.g., $W$ in an RNN) for every layer or time step. If the matrix operation inherently "stretches" the gradient vectors, this repeated multiplication causes the weight gradients at earlier layers to grow exponentially. The result is that the optimization algorithm takes massive, unstable steps that can introduce instability in the training process, slow it down, or halt it entirely.
 </div>
 </div>
 ### Attention
@@ -238,15 +263,33 @@ $$Q = HW_Q, \qquad K = HW_K, \qquad V = HW_V$$
 <figure>
 <pre class="mermaid">
 %%{init: {"flowchart": {"nodeSpacing": 50, "rankSpacing": 70}}}%%
-flowchart LR
-  H["H<br/>(n × d)<br/>stacked hidden states"] -- "× W_Q" --> Q["Q<br/>(n × d_k)"]
-  H -- "× W_K" --> K["K<br/>(n × d_k)"]
-  H -- "× W_V" --> V["V<br/>(n × d_v)"]
-  classDef inp fill:#0C2A3F,stroke:#38BDF8
-  classDef outp fill:#3A1D24,stroke:#F87171
-  class H inp
-  class Q,K,V outp
-  linkStyle default stroke:#475569,stroke-width:1.5px
+flowchart TD
+  H["Stacked Hidden States H<br/>(n × d)"]
+
+  WQ["Linear Projection<br/>× W_Q (d × d_k)"]
+  WK["Linear Projection<br/>× W_K (d × d_k)"]
+  WV["Linear Projection<br/>× W_V (d × d_v)"]
+
+  Q["Queries (Q)<br/>(n × d_k)<br/><i>'What am I looking for?'</i>"]
+  K["Keys (K)<br/>(n × d_k)<br/><i>'What information do I offer?'</i>"]
+  V["Values (V)<br/>(n × d_v)<br/><i>'What is my actual content?'</i>"]
+
+  H ==> WQ ==> Q
+  H ==> WK ==> K
+  H ==> WV ==> V
+
+  %% Styling
+  classDef inputMat fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+  classDef weightMat fill:#1e1b4b,stroke:#818cf8,stroke-width:1.5px,color:#f8fafc
+  classDef queryMat fill:#4c1d95,stroke:#a855f7,stroke-width:2px,color:#fff
+  classDef keyMat fill:#065f46,stroke:#34d399,stroke-width:2px,color:#fff
+  classDef valueMat fill:#831843,stroke:#f43f5e,stroke-width:2px,color:#fff
+
+  class H inputMat
+  class WQ,WK,WV weightMat
+  class Q queryMat
+  class K keyMat
+  class V valueMat
 </pre>
 <figcaption>The stacked hidden states $H$ are projected through three independent, learnable weight matrices to produce the query, key, and value matrices.</figcaption>
 </figure>
@@ -263,47 +306,155 @@ There's no encoder feeding a separate decoder anymore, one sequence generates al
 <figure>
 <pre class="mermaid">
 %%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 120}}}%%
-flowchart LR
-  subgraph Q["as queries"]
-    direction TB
-    QX1["x₁"]
-    QX2["x₂"]
-    QX3["x₃"]
-    QX4["x₄"]
-  end
-  subgraph K["as keys / values"]
-    direction TB
-    KX1["x₁"]
-    KX2["x₂"]
-    KX3["x₃"]
-    KX4["x₄"]
-  end
-  QX1 --> KX1 & KX2 & KX3 & KX4
-  QX2 --> KX1 & KX2 & KX3 & KX4
-  QX3 --> KX1 & KX2 & KX3 & KX4
-  QX4 --> KX1 & KX2 & KX3 & KX4
-  classDef inp fill:#0C2A3F,stroke:#38BDF8
-  class QX1,QX2,QX3,QX4,KX1,KX2,KX3,KX4 inp
-  linkStyle default stroke:#475569,stroke-width:1px
+flowchart TD
+  Q["Queries (Q)<br/>(n × d_k)"]
+  K["Keys (K)<br/>(n × d_k)"]
+  V["Values (V)<br/>(n × d_v)"]
+
+  SCORE["Scores from Matrix Multiply (Q × Kᵀ)<br/>(n × n)"]
+  ATTN_W["Attention Weights<br/>(n × n)"]
+  OUT["Contextualized Matrix<br/>(n × d_v)"]
+
+  Q ==> SCORE
+  K -.->|"Transposed"| SCORE
+  
+  SCORE ==>|"Softmax Normalization"| ATTN_W
+  
+  ATTN_W ==>|"Weighted Combination (Weights × V)"| OUT
+  V -.->|"Multiplied by Weights"| OUT
+
+  %% Styling
+  classDef queryMat fill:#4c1d95,stroke:#a855f7,stroke-width:2px,color:#fff
+  classDef keyMat fill:#065f46,stroke:#34d399,stroke-width:2px,color:#fff
+  classDef valueMat fill:#831843,stroke:#f43f5e,stroke-width:2px,color:#fff
+  classDef interMat fill:#1e293b,stroke:#94a3b8,stroke-width:1.5px,color:#f8fafc
+  classDef outMat fill:#7c2d12,stroke:#f97316,stroke-width:2px,color:#fff
+
+  class Q queryMat
+  class K keyMat
+  class V valueMat
+  class SCORE,ATTN_W interMat
+  class OUT outMat
 </pre>
-<figcaption>In self-attention, the same input sequence plays both roles: every token, as a query, attends to every token, including itself, as a key/value. There's no separate encoder feeding this, and no recurrence, every pairwise interaction happens in one step.</figcaption>
+<figcaption>In self-attention, the same input sequence plays both roles: every token, as a query, attends to every token, including itself, as a key/value. </figcaption>
 </figure>
 
 ### Implementing attention in JAX
 
-With the pieces above in place, here's a minimal, unscaled, unmasked self-attention layer in JAX, operating on one hand-crafted sequence so every intermediate matrix stays small enough to inspect directly. Scaling and masking are covered once the transformer block is assembled in the next post.
+As seen above, attention is simply a series of matrix multiplications. The following implementation uses Flax[^flax], a library with handy abstractions for commonly used primitives in machine learning. The linear layers used here are not merely analogous to a matrix multiplication, they are exactly one: [`nnx.Linear`](https://flax.readthedocs.io/en/stable/api_reference/flax.nnx/nn/linear.html) computes $y = xW + b$, and constructing it with `use_bias=False` drops the offset and leaves $y = xW$, a single learned weight matrix and nothing else. Notably, Flax also provides an implementation of [Attention](https://flax.readthedocs.io/en/stable/api_reference/flax.nnx/nn/attention.html), the implementation below is simply a learning exercise:
 
-<!-- TODO: code block, single-sequence single-head unscaled/unmasked attention, matches companion notebook -->
+```python
+import jax
+import jax.numpy as jnp
+from flax import nnx
 
-<!-- TODO: attention-matrix heatmap for this example, computed in the notebook -->
 
-The full notebook is available <!-- TODO: link once notebook exists -->.
+class Attention(nnx.Module):
+    """Single-head attention: three bias-free projections and two matrix multiplies."""
 
-### Where this leads
+    def __init__(self, d_model: int, d_k: int, d_v: int, *, rngs: nnx.Rngs):
+        # use_bias=False makes each projection exactly x @ W, with no affine offset
+        self.w_q = nnx.Linear(d_model, d_k, use_bias=False, rngs=rngs)
+        self.w_k = nnx.Linear(d_model, d_k, use_bias=False, rngs=rngs)
+        self.w_v = nnx.Linear(d_model, d_v, use_bias=False, rngs=rngs)
 
-Vaswani et al. (2017)[^vaswani] showed that attention alone, stacked with simple feed-forward layers and no recurrence at all, reaches state-of-the-art translation quality, measured in BLEU score, a standard machine-translation metric. That architecture is the transformer, the subject of the next post. <!-- next post starts with transformer and then moves on to decoder only after explaining why and then implements it-->
+    def __call__(self, x_query, x_context):
+        queries = self.w_q(x_query)      # (n, d_k)
+        keys = self.w_k(x_context)       # (m, d_k)
+        values = self.w_v(x_context)     # (m, d_v)
 
-The takeaway from this post is narrower than that: attention removes the fixed-context bottleneck, and because self-attention needs no recurrence, it lets a sequence be processed in parallel instead of one token at a time. That parallelism is what makes training at the scale modern language models run at even feasible; training genuinely deep stacks of these layers is a separate problem, solved with residual connections and normalization, covered once the full transformer block is assembled. What follows from here, the fluency and apparent reasoning of large language models, comes from stacking this simple primitive, matrix multiplications and softmax, at scale, trained on enormous amounts of curated data, not from any single new mechanical trick.
+        scores = queries @ keys.T                    # (n, m), one score per pair
+        weights = jax.nn.softmax(scores, axis=-1)    # each row sums to 1
+        return weights @ values                      # (n, d_v)
+
+
+model = Attention(d_model=16, d_k=8, d_v=12, rngs=nnx.Rngs(0))
+context = jnp.ones((7, 16))
+sequence = jnp.ones((5, 16))
+
+cross = model(sequence, context)   # (5, 12), cross-attention
+self_attended = model(sequence, sequence)   # (5, 12), self-attention
+```
+
+Keys and values take a single `x_context` argument rather than one each, because key $j$ and value $j$ are two projections of the same token: the thing being matched against and the thing contributed when it matches. Self-attention is then not a separate mechanism at all, it is the same call with the same sequence passed in both roles. The `axis=-1` on the softmax is load-bearing: normalizing along the key axis is what makes each query's weights sum to 1, and therefore what makes the final line a weighted average rather than an arbitrary sum.
+
+Every arrow below is one line of that `__call__`, with the shapes the constructor above actually produces: a five-token query sequence attending over a seven-token context, `d_model = 16`, `dₖ = 8`, `dᵥ = 12`.
+
+<figure>
+<pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 40, "rankSpacing": 95}}}%%
+flowchart LR
+  XQ["x_query<br/>(5 × 16)"]
+  XC["x_context<br/>(7 × 16)"]
+
+  Q["queries<br/>(5 × 8)"]
+  K["keys<br/>(7 × 8)"]
+  V["values<br/>(7 × 12)"]
+
+  S["scores<br/>(5 × 7)"]
+  W["weights<br/>(5 × 7)<br/>rows sum to 1"]
+  O["output<br/>(5 × 12)"]
+
+  XQ -- "@ w_q kernel (16 × 8)" --> Q
+  XC -- "@ w_k kernel (16 × 8)" --> K
+  XC -- "@ w_v kernel (16 × 12)" --> V
+
+  Q == "@ keys.T" ==> S
+  K -.-> S
+  S == "softmax(axis=-1)" ==> W
+  W == "@ values" ==> O
+  V -.-> O
+
+  classDef input fill:#0f172a,stroke:#38bdf8,stroke-width:1.5px,color:#f8fafc
+  classDef queryMat fill:#4c1d95,stroke:#a855f7,stroke-width:2px,color:#fff
+  classDef keyMat fill:#065f46,stroke:#34d399,stroke-width:2px,color:#fff
+  classDef valueMat fill:#831843,stroke:#f43f5e,stroke-width:2px,color:#fff
+  classDef interMat fill:#1e293b,stroke:#94a3b8,stroke-width:1.5px,color:#f8fafc
+  classDef outMat fill:#7c2d12,stroke:#f97316,stroke-width:2px,color:#fff
+
+  class XQ,XC input
+  class Q queryMat
+  class K keyMat
+  class V valueMat
+  class S,W interMat
+  class O outMat
+</pre>
+<figcaption>The implemented module, end to end. Every labelled arrow is a matrix multiplication and the three kernels named on them are the entire parameter set, no biases anywhere; the only step that is not a matmul is the softmax. Training adjusts nothing but those three matrices.</figcaption>
+</figure>
+
+The forward pass really is only that: two matrix multiplications with a softmax between them. Nothing in it needed a hand-written derivative, which is the point of building it in JAX, the backward pass is asking for gradients of a loss with respect to the three weight matrices, and handing them to an optimizer:
+
+```python
+import optax
+
+optimizer = nnx.Optimizer(model, optax.adamw(1e-3), wrt=nnx.Param)
+
+
+def loss_fn(model, x, context, target):
+    return jnp.mean((model(x, context) - target) ** 2)
+
+
+target = jnp.zeros((5, 12))   # stand-in for whatever the task supervises
+
+loss, grads = nnx.value_and_grad(loss_fn)(model, sequence, context, target)
+optimizer.update(model, grads)
+```
+
+The gradient that comes back for `w_q` is shaped $(16, 8)$, exactly the shape of its weight matrix, and `update` steps that matrix. Learning attention is nothing more than repeating those two lines: differentiate the matrix multiplications, nudge the three matrices, repeat.
+
+An optimizer is the rule that turns those gradients into an actual change in the weights. The gradient only says which direction increases the loss; it says nothing about how far to move. The simplest rule, plain gradient descent, is the one from the [first post in this series]({% post_url 2026-04-07-MachineLearningBeginning %}):
+
+$$W \leftarrow W - \eta \nabla_W L$$
+
+The step size $\eta$ is the learning rate, and it is unforgiving. Too large and each update overshoots the minimum it was aiming at, so the loss oscillates or diverges outright. Too small and training crawls, or settles into the first shallow dip it encounters. Worse, no single $\eta$ suits every parameter: a weight receiving consistently large gradients wants smaller steps than one that is barely updated at all, and the right scale changes as training progresses.
+
+`optax.adamw` is what handles this. Adam[^adam] keeps a running estimate of both the mean and the variance of each parameter's recent gradients, and divides the step by the square root of that variance, so every weight gets its own effective step size: parameters with large or erratic gradients are damped, parameters with small steady gradients are amplified. The `1e-3` passed above is still a learning rate and still sets the overall scale, so it has not disappeared, but the optimizer absorbs most of the per-parameter tuning that would otherwise have to be done by hand. The `W` in AdamW[^adamw] is decoupled weight decay, which shrinks weights directly during the update rather than by adding a penalty to the loss, the version that behaves correctly alongside Adam's per-parameter scaling. For a survey of these rules and what each one fixes about plain gradient descent, Ruder's overview[^ruder] is the clearest single reference.
+
+### Up next
+
+Vaswani et al. (2017)[^vaswani] showed that attention alone, stacked with simple feed-forward layers and no recurrence at all, reaches state-of-the-art translation quality, measured in BLEU score (a standard machine-translation metric). That architecture is the transformer, the subject of the next post. <!-- next post starts with transformer and then moves on to decoder only after explaining why and then implements it-->
+
+the takeaway from this post is narrower than that: attention removes the fixed-context bottleneck, and because self-attention needs no recurrence, it lets a sequence be processed in parallel instead of one token at a time. this parallelism makes training at the scale modern language models run feasible; training deep. A key takeaway from this post is the fluency and emergent reasoning capabilities of large language models, comes from stacking this simple primitive, matrix multiplications and softmax, at scale, trained on enormous amounts of curated data.
 
 #### References
 
@@ -313,5 +464,8 @@ The takeaway from this post is narrower than that: attention removes the fixed-c
 [^pascanu]: Pascanu, R., Mikolov, T., & Bengio, Y. (2013). [*On the Difficulty of Training Recurrent Neural Networks.*](https://arxiv.org/abs/1211.5063) Proceedings of the 30th International Conference on Machine Learning (ICML).
 [^lstm]: Hochreiter, S., & Schmidhuber, J. (1997). [*Long Short-Term Memory.*](https://direct.mit.edu/neco/article/9/8/1735/6109/Long-Short-Term-Memory) Neural Computation, 9(8), 1735-1780. For a gentler walkthrough, see [Christopher Olah's *Understanding LSTM Networks*](https://colah.github.io/posts/2015-08-Understanding-LSTMs/).
 [^vaswani]: Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). [*Attention Is All You Need.*](https://arxiv.org/abs/1706.03762) Advances in Neural Information Processing Systems (NeurIPS). For a highly visual walkthrough of the resulting architecture, see [Jay Alammar's *The Illustrated Transformer*](https://jalammar.github.io/illustrated-transformer/).
-
+[^flax]: [Flax documentation](https://flax.readthedocs.io/en/stable/key_concepts.html)
+[^adam]: Kingma, D. P., & Ba, J. (2015). [*Adam: A Method for Stochastic Optimization.*](https://arxiv.org/abs/1412.6980) International Conference on Learning Representations (ICLR).
+[^adamw]: Loshchilov, I., & Hutter, F. (2019). [*Decoupled Weight Decay Regularization.*](https://arxiv.org/abs/1711.05101) International Conference on Learning Representations (ICLR). The Optax implementation used here is documented under [`optax.adamw`](https://optax.readthedocs.io/en/latest/api/optimizers.html#optax.adamw).
+[^ruder]: Ruder, S. (2016). [*An Overview of Gradient Descent Optimization Algorithms.*](https://www.ruder.io/optimizing-gradient-descent/) A walkthrough of how each optimizer, from vanilla SGD through momentum, Adagrad, RMSprop and Adam, changes the way the learning rate is applied.
 

@@ -22,8 +22,8 @@ remove-ads: true
 ###############################################
 
 navbar-links:
-  About Me: 'aboutme'
-  Blog: 'blog'
+  # About Me: 'aboutme'
+  # Blog: 'blog'
   # Resources:
   #   - Beautiful Jekyll: "https://beautifuljekyll.com"
   #   - Learn markdown: "https://www.markdowntutorial.com/"
@@ -55,37 +55,10 @@ social-network-links:
   # facebook: deanattali
   github: Naman-sopho
   linkedin: naman-tiwari
-  # twitter: daattali
-  # patreon: DeanAttali
-  # youtube: "@daattali"
-  # whatsapp: 15551212
-#  medium: yourname
-#  reddit: yourname or r/yoursubreddit
-#  xing: yourname
-#  stackoverflow: "3943160/daattali"
-#  snapchat: deanat78
-#  instagram: deanat78
-#  spotify: yourname
-#  telephone: +14159998888
-#  steam: deanat78
-#  twitch: yourname
-#  yelp: yourname
-#  telegram: yourname
-#  calendly: yourname
-#  mastodon: instance.url/@username
-#  bluesky: yourname
-#  ORCID: your ORCID ID
-#  google-scholar: your google scholar
-#  discord: "invite_code" or "users/userid" or "invite/invite_code"
-#  kaggle: yourname
-#  hackerrank: yourname
-#  gitlab: yourname
-#  itchio: yourname
-#  untappd: yourname
 
 # If you want your website to generate an RSS feed, provide a description
 # The URL for the feed will be https://<your_website>/feed.xml
-rss-description: This website is a virtual proof that I'm awesome
+# rss-description: This website is a virtual proof that I'm awesome
 
 ###########################
 # --- General options --- #
@@ -115,7 +88,7 @@ feed_show_excerpt: true
 feed_show_tags: true
 
 # Add a search button to the navbar
-post_search: false
+post_search: true 
 
 # Add a button in the footer to edit the current page. Only works if your website is hosted on GitHub
 edit_page_button: false
@@ -171,7 +144,7 @@ site-js:
 #################################
 
 # Fill in your Google Analytics tag ID (or "Measurement ID") to track your website usage
-#gtag: "G-XXXXXXXXXX"
+gtag: "GTM-5CZBCB2P"
 
 # Fill in your Cloudflare Analytics beacon token to track your website using Cloudflare Analytics
 #cloudflare_analytics: ""
@@ -264,7 +237,11 @@ timezone: 'America/Toronto'
 markdown: kramdown
 highlighter: rouge
 permalink: /:year-:month-:day-:title/
-paginate: 5
+# Pagination is off. jekyll-paginate can only paginate a root index.html, and that
+# page now filters to the last year (`recent-only`), which paginate cannot see:
+# it would emit /page2/, /page3/ ... each duplicating the filtered home page.
+# The unpaginated full archive lives at /blog/.
+#paginate: 5
 
 kramdown:
   input: GFM
@@ -287,6 +264,7 @@ defaults:
 exclude:
   - .venv/
   - CHANGELOG.md
+  - CLAUDE.md
   - CNAME
   - Gemfile
   - Gemfile.lock

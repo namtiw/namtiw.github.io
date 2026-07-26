@@ -1,4 +1,8 @@
 {% if page.mermaid %}
+<!-- mermaid renders $$...$$ in diagram labels with its bundled KaTeX; this
+     stylesheet is what makes fractions, radicals and big delimiters lay out
+     correctly. Plain sub/superscripts survive without it. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" crossorigin="anonymous">
 <script type="module">
   import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
   mermaid.initialize({
@@ -17,7 +21,11 @@
       fontSize: "18px"
     },
     flowchart: {
-      subGraphTitleMargin: { top: 8, bottom: 8 }
+      subGraphTitleMargin: { top: 8, bottom: 8 },
+      // dagre reserves no vertical room for a subgraph title when that
+      // subgraph has nested subgraphs; the extra padding keeps the nested
+      // boxes from riding up over the parent's label.
+      padding: 30
     },
     themeCSS: ".cluster-label { font-size: 1.25em; font-weight: 600; } .nodeLabel, .edgeLabel { font-size: 18px; }"
   });

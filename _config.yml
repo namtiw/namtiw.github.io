@@ -144,13 +144,13 @@ site-js:
 #################################
 
 # Fill in your Google Analytics tag ID (or "Measurement ID") to track your website usage
-gtag: "GTM-5CZBCB2P"
+gtag: "G-GMYFR9KSK2"
 
 # Fill in your Cloudflare Analytics beacon token to track your website using Cloudflare Analytics
 #cloudflare_analytics: ""
 
 # Google Tag Manager ID
-#gtm: ""
+gtm: "GTM-5CZBCB2P"
 
 # Matomo (aka Piwik) Web statistics
 # Uncomment the following section to enable Matomo. The opt-out parameter controls

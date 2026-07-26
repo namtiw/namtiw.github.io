@@ -4,11 +4,44 @@ layout: page
 
 {{ content }}
 
-{% assign posts = paginator.posts | default: site.posts %}
+{% comment %}
+  `recent-only: true` in a page's front matter limits the feed to posts from the
+  last year. The cutoff is measured from `site.time`, i.e. the moment the site was
+  BUILT, not the moment it is viewed: a post ages out of the list only on the next
+  rebuild. Pagination is bypassed when filtering, because jekyll-paginate slices
+  site.posts before this layout runs, which would leave short or empty pages.
+{% endcomment %}
+{% assign filter_posts = false %}
+{% if page.recent-only %}
+  {% assign posts = site.posts %}
+  {% assign cutoff = site.time | date: "%s" | plus: 0 | minus: 31536000 %}
+
+  {%- comment -%}
+    Count what the filter would leave first. If nothing in the site is recent
+    enough, fall back to showing every post rather than an empty page.
+  {%- endcomment -%}
+  {% assign recent_count = 0 %}
+  {% for post in site.posts %}
+    {% assign post_epoch = post.date | date: "%s" | plus: 0 %}
+    {% if post_epoch >= cutoff %}
+      {% assign recent_count = recent_count | plus: 1 %}
+    {% endif %}
+  {% endfor %}
+  {% if recent_count > 0 %}
+    {% assign filter_posts = true %}
+  {% endif %}
+{% else %}
+  {% assign posts = paginator.posts | default: site.posts %}
+{% endif %}
+
 
 <!-- role="list" needed so that `list-style: none` in Safari doesn't remove the list semantics -->
 <ul class="posts-list list-unstyled" role="list">
   {% for post in posts %}
+  {% if filter_posts %}
+    {% assign post_epoch = post.date | date: "%s" | plus: 0 %}
+    {% if post_epoch < cutoff %}{% continue %}{% endif %}
+  {% endif %}
   <li class="post-preview">
     <article>
 
@@ -100,7 +133,7 @@ layout: page
   {% endfor %}
 </ul>
 
-{% if paginator.total_pages > 1 %}
+{% if paginator.total_pages > 1 and page.recent-only != true %}
 <ul class="pagination main-pager">
   {% if paginator.previous_page %}
   <li class="page-item previous">

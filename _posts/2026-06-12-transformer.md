@@ -1,4 +1,3 @@
-
 ---
 layout: post
 title: Assembling the Transformer 
@@ -7,7 +6,7 @@ thumbnail-img: /assets/img/ml.jpg
 mathjax: true
 mermaid: true
 published: false
-tags: [Machine-Learning, RNN, Attention, Self-attention, JAX]
+tags: [Machine-Learning, Transformer, Self-attention, JAX]
 ---
 
 

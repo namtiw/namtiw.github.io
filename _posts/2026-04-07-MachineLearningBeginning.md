@@ -2,7 +2,8 @@
 layout: post
 title: Machine Learning
 subtitle: From scratch in JAX
-thumbnail-img: /assets/img/ml.jpg
+thumbnail-img: /assets/img/ml.png
+cover-img: /assets/img/ml_cover_dark.png
 mathjax: true
 mermaid: true
 published: false

@@ -30,6 +30,7 @@ layout: page
   {% if recent_count > 0 %}
     {% assign filter_posts = true %}
   {% endif %}
+  {% assign older_count = site.posts.size | minus: recent_count %}
 {% else %}
   {% assign posts = paginator.posts | default: site.posts %}
 {% endif %}
@@ -132,6 +133,22 @@ layout: page
   </li>
   {% endfor %}
 </ul>
+
+{%- comment -%}
+  When the feed is filtered to the last year and older posts exist but are hidden,
+  offer a way through to them. Skipped in the fallback case, where nothing was
+  filtered out and the archive would just repeat this page.
+{%- endcomment -%}
+{% if filter_posts and older_count > 0 %}
+<ul class="pagination main-pager">
+  <li class="page-item next">
+    <a class="page-link" href="{{ '/blog' | relative_url }}">
+      <span class="d-none d-sm-inline-block">Older Posts</span>
+      <i class="fas fa-arrow-right" alt="Older Posts"></i>
+    </a>
+  </li>
+</ul>
+{% endif %}
 
 {% if paginator.total_pages > 1 and page.recent-only != true %}
 <ul class="pagination main-pager">

@@ -454,9 +454,9 @@ The step size $\eta$ is the learning rate, and it is unforgiving. Too large and 
 
 ### Up next
 
-Vaswani et al. (2017)[^vaswani] showed that attention alone, stacked with simple feed-forward layers and no recurrence at all, reaches state-of-the-art translation quality, measured in BLEU score (a standard machine-translation metric). That architecture is the transformer, the subject of the next post. <!-- next post starts with transformer and then moves on to decoder only after explaining why and then implements it-->
+The takeaway from this post is a narrow one: attention removes the fixed-context bottleneck, and because self-attention needs no recurrence, a sequence can be processed in parallel instead of one token at a time. That parallelism is what makes training at the scale modern language models are trained at feasible in the first place, and the fluency and emergent reasoning those models show comes from stacking this one simple primitive, matrix multiplications and a softmax, at that scale, on enormous amounts of curated data.
 
-the takeaway from this post is narrower than that: attention removes the fixed-context bottleneck, and because self-attention needs no recurrence, it lets a sequence be processed in parallel instead of one token at a time. this parallelism makes training at the scale modern language models run feasible; training deep. A key takeaway from this post is the fluency and emergent reasoning capabilities of large language models, comes from stacking this simple primitive, matrix multiplications and softmax, at scale, trained on enormous amounts of curated data.
+Vaswani et al. (2017)[^vaswani] showed that attention alone, wired together with simple feed-forward layers and no recurrence at all, reaches state-of-the-art translation quality, measured in BLEU score (a standard machine-translation metric). That architecture is the transformer, and assembling it, along with the residual connections, normalization and positional encoding it needs to work, is the subject of [the next post]({% post_url 2026-06-12-transformer %}).
 
 ## References
 

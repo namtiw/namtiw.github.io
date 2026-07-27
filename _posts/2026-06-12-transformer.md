@@ -9,13 +9,48 @@ published: false
 tags: [Machine-Learning, Transformer, Self-attention, JAX]
 ---
 
-The [previous post]({% post_url 2026-05-02-attention %}) introduced self-attention: Queries, Keys, Values and a softmax. Self-attention enables the model to capture semantic coorelation from far away words allowing longer inputs. This is in turn makes a rich context available to predict the output tokens. Transformers, as introduced in "Attention is all you need"[^vaswani], followed an encoder-decoder architecture with residual connections.
+The [previous post]({% post_url 2026-05-02-attention %}) introduced self-attention: Queries, Keys, Values and a softmax. Self-attention enables the model to capture semantic correlation between far apart words, allowing longer inputs. That in turn makes a rich context available to predict the output tokens. Transformers, as introduced in "Attention is all you need"[^vaswani], followed an encoder-decoder architecture with residual connections.
 
 ## Encoder-decoder architecture 
 
-<!-- TODO: insert diagram from the paper and attribute correctly-->
+The architecture is an encoder that reads the source sentence and a decoder that writes the target sentence one token at a time. Both are built from the same two sublayers, self-attention followed by a multilayer perceptron. The decoder has a third sublayer which attends over the encoder's output, the cross-attention from the previous post. The best performing networks stack several such encoder and decoder layers, six of each in the paper. The paper also introduces the following additions to the self-attention layer to improve overall model performance.
 
-Figure shows an encoder that reads the source sentence and a decoder that writes the target sentence one token at a time. Both are made of the same two sublayers, self-attention followed by a MultilayerfPerceptron. The decoder has a third sublayer which attends over the encoder's output. The best performaning network use mutliple such encoder-decoder pairs connected sequentially. The paper also mentions the following notable additions to a self attention layer to improve overall model performance.
+<figure>
+<pre class="mermaid">
+%%{init: {"flowchart": {"nodeSpacing": 40, "rankSpacing": 55, "padding": 30}}}%%
+flowchart TB
+  SRC["Source tokens<br/>+ positional encoding"]
+  TGT["Target tokens so far<br/>+ positional encoding"]
+
+  subgraph ENC["Encoder layer (× 6)"]
+    direction TB
+    ESA["Self-attention<br/>every position sees every other"] --> EFF["Feed-forward network"]
+  end
+
+  subgraph DEC["Decoder layer (× 6)"]
+    direction TB
+    DSA["Masked self-attention<br/>each position sees only its prefix"] --> DCA["Cross-attention<br/>queries from the decoder,<br/>keys and values from the encoder"] --> DFF["Feed-forward network"]
+  end
+
+  SRC ==> ESA
+  TGT ==> DSA
+  EFF ==>|"encoder output"| DCA
+  DFF ==> OUT["Linear to vocabulary<br/>→ next target token"]
+
+  classDef input fill:#0f172a,stroke:#38bdf8,stroke-width:1.5px,color:#f8fafc
+  classDef attn fill:#4c1d95,stroke:#a855f7,stroke-width:1.5px,color:#f8fafc
+  classDef cross fill:#1e293b,stroke:#94a3b8,stroke-width:1.5px,color:#f8fafc
+  classDef ff fill:#065f46,stroke:#34d399,stroke-width:1.5px,color:#f8fafc
+  classDef out fill:#7c2d12,stroke:#f97316,stroke-width:2px,color:#ffffff
+
+  class SRC,TGT input
+  class ESA,DSA attn
+  class DCA cross
+  class EFF,DFF ff
+  class OUT out
+</pre>
+<figcaption>The two stacks of the original architecture. Each sublayer shown here is wrapped in a residual connection and a layer normalization, left out to keep the diagram readable; they are the subject of the next section.</figcaption>
+</figure>
 
 ## Residual connections, layer normalization and Scaled dot product attention
 
@@ -28,7 +63,7 @@ Residual connections, $x +$ [^resnet], adding the input back to the output allow
 <div class="collapsiblecontainer">
 <div class="collapsibleheader"><span>+ </span>Post-norm and pre-norm</div>
 <div class="collapsiblecontent" markdown="1">
-The formula above applies the normalization after the residual addition, reffered to as post-norm. $x + \text{Sublayer}(\text{LayerNorm}(x))$, pre-norm, adding the residual input to normalized output of a layer. Post norm produces disproportionately large gradients during initialization [^xiong]. The Transformer paper uses a learning rate warmup schedule during training to combat this issue. The implementation later in this post uses pre-norm which does not have this limitation.
+The formula above applies the normalization after the residual addition, referred to as post-norm. $x + \text{Sublayer}(\text{LayerNorm}(x))$, pre-norm, adding the residual input to normalized output of a layer. Post norm produces disproportionately large gradients during initialization [^xiong]. The Transformer paper uses a learning rate warmup schedule during training to combat this issue. The implementation later in this post uses pre-norm which does not have this limitation.
 </div>
 </div>
 
@@ -40,7 +75,7 @@ $$\text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^T}{\sqrt{d_k}}\righ
 
 ## Multi-head attention
 
- Multi-head attention runs $h$ copies of the mechanism in parallel, each with its own query, key and value projection, and concatenates their outputs. This introduces more non-linearities in the network and enables it learn more complex semantic relationships. Intuitively, a sentence consists of multiple relevant contexts to convey full meaning. For instance, resolving a pronoun, tracking which noun a verb agrees with, and finding the object of a preposition are separate lookups.
+ Multi-head attention runs $h$ copies of the mechanism in parallel, each with its own query, key and value projection, and concatenates their outputs. This gives the model more independent representation spaces to allow capturing more context from the input. Intuitively, a sentence consists of multiple relevant contexts to convey full meaning. For instance, resolving a pronoun, tracking which noun a verb agrees with, and finding the object of a preposition are separate lookups.
 
 <figure>
 <pre class="mermaid">
@@ -75,7 +110,7 @@ flowchart TB
 
 ## Masked self-attention
 
-Self-attention as built so far lets every position see every other position, this is wrong in sentence generation usecase. A language model generates one token at a time, each conditioned on the tokens before it. If during training position $i$ attend to position $i+1$, the model would learn to read the answer off its own input, which will be unavailable when testing on unseen inputs. Masking during training, position $i$ sees positions $1$ through $i$ and nothing else, exactly the information it will have when generating.
+Self-attention as built so far lets every position see every other position, which is wrong for the sentence generation use case. A language model generates one token at a time, each conditioned on the tokens before it. If during training position $i$ attends to position $i+1$, the model learns to read the answer off its own input, which will be unavailable when generating on unseen inputs. Masking fixes this: position $i$ sees positions $1$ through $i$ and nothing else, exactly the information it will have when generating.
 
 The mask is applied before the softmax, with the masked entries set to $-\infty$. Then $e^{-\infty} = 0$ falls out of the exponential, the denominator only ever sums the legal entries, and each row renormalizes itself over the positions it is allowed to see.
 
@@ -106,9 +141,9 @@ $$
 
 ## Positional encoding
 
-Sequential nature of RNNs allowed them to learn that nature of language but Self-attention reads everything at once, and the mechanism is permutation invariant: shuffling the rows of the input cause the rows of the output to shuffle identically, with the same values ($QK^T$), so "dog bites man" and "man bites dog" would produce the same set of representations.
+The sequential nature of RNNs let them learn that aspect of language for free, but self-attention reads everything at once, and the mechanism is permutation invariant: shuffling the rows of the input causes the rows of the output to shuffle identically, with the same values ($QK^T$), so "dog bites man" and "man bites dog" would produce the same set of representations.
 
-The paper uses additional positional embeddings as input to the network. Using sinusoids allows the model to capture relative distances between tokens alongside the semantic relationsihps.
+The paper adds positional embeddings to the input of the network. Using sinusoids allows the model to capture relative distances between tokens alongside the semantic relationships.
 
 $$PE_{(pos, 2i)} = \sin\!\left(\frac{pos}{10000^{2i/d_{model}}}\right), \qquad PE_{(pos, 2i+1)} = \cos\!\left(\frac{pos}{10000^{2i/d_{model}}}\right)$$
 
@@ -178,7 +213,6 @@ What the model learns from this is to spend tokens before committing to an answe
 
 The pieces above amount to little code. As in the previous post the implementation uses Flax[^flax], and again it reimplements something the library already provides, [`nnx.MultiHeadAttention`](https://flax.readthedocs.io/en/stable/api_reference/flax.nnx/nn/attention.html), for learning purposes.
 
-Multi-head attention first. This is the `Attention` module from the previous post with a head axis and mask:
 
 ```python
 import jax
@@ -186,45 +220,48 @@ import jax.numpy as jnp
 from flax import nnx
 
 
+class Head(nnx.Module):
+    """One attention head: the previous post's module, scaled and masked."""
+
+    def __init__(self, d_model: int, d_k: int, *, rngs: nnx.Rngs):
+        self.d_k = d_k
+        self.w_q = nnx.Linear(d_model, d_k, use_bias=False, rngs=rngs)
+        self.w_k = nnx.Linear(d_model, d_k, use_bias=False, rngs=rngs)
+        self.w_v = nnx.Linear(d_model, d_k, use_bias=False, rngs=rngs)
+
+    def __call__(self, x, mask):
+        queries, keys, values = self.w_q(x), self.w_k(x), self.w_v(x)   # (b, n, d_k)
+
+        scores = queries @ keys.swapaxes(-1, -2) / jnp.sqrt(self.d_k)   # (b, n, n)
+        scores = jnp.where(mask, scores, -jnp.inf)                      # before the softmax
+
+        weights = jax.nn.softmax(scores, axis=-1)   # each row sums over its prefix
+        return weights @ values                     # (b, n, d_k)
+```
+
+Three things changed from the previous post's version. The scores are divided by $\sqrt{d_k}$; the mask is applied to them, and applied *before* `jax.nn.softmax` runs, which is what makes each row renormalize over its visible prefix; and `keys.T` became `keys.swapaxes(-1, -2)`, because these inputs carry a leading batch axis and `.T` would reverse it along with the rest.
+
+A multi-head layer is then just several of those, run on the same input, with their outputs laid side by side:
+
+```python
 class MultiHeadAttention(nnx.Module):
-    """Multi-head self-attention over a batch of sequences."""
+    """Multi-head causal self-attention over a batch of sequences."""
 
     def __init__(self, d_model: int, n_heads: int, *, rngs: nnx.Rngs):
         assert d_model % n_heads == 0
-        self.n_heads = n_heads
-        self.d_k = d_model // n_heads
-
-        # one wide projection per role, later split across heads
-        self.w_q = nnx.Linear(d_model, d_model, use_bias=False, rngs=rngs)
-        self.w_k = nnx.Linear(d_model, d_model, use_bias=False, rngs=rngs)
-        self.w_v = nnx.Linear(d_model, d_model, use_bias=False, rngs=rngs)
+        self.heads = nnx.List([
+            Head(d_model, d_model // n_heads, rngs=rngs) for _ in range(n_heads)
+        ])
         self.w_o = nnx.Linear(d_model, d_model, use_bias=False, rngs=rngs)
 
-    def split_heads(self, x):
-        b, n, _ = x.shape
-        # (b, n, d_model) -> (b, n, h, d_k) -> (b, h, n, d_k)
-        return x.reshape(b, n, self.n_heads, self.d_k).transpose(0, 2, 1, 3)
-
     def __call__(self, x):
-        b, n, _ = x.shape
-
-        queries = self.split_heads(self.w_q(x))   # (b, h, n, d_k)
-        keys = self.split_heads(self.w_k(x))      # (b, h, n, d_k)
-        values = self.split_heads(self.w_v(x))    # (b, h, n, d_k)
-
-        scores = queries @ keys.swapaxes(-1, -2) / jnp.sqrt(self.d_k)   # (b, h, n, n)
-
+        n = x.shape[-2]
         causal = jnp.tril(jnp.ones((n, n), dtype=bool))   # True on and below the diagonal
-        scores = jnp.where(causal, scores, -jnp.inf)      # mask before the softmax
 
-        weights = jax.nn.softmax(scores, axis=-1)         # each row sums to 1
-        heads = weights @ values                          # (b, h, n, d_k)
-
-        merged = heads.transpose(0, 2, 1, 3).reshape(b, n, -1)   # (b, n, d_model)
-        return self.w_o(merged)
+        outputs = [head(x, causal) for head in self.heads]   # each (b, n, d_k)
+        return self.w_o(jnp.concatenate(outputs, axis=-1))   # (b, n, d_model)
 ```
 
-The heads are not separate modules. One projection of width $d_{model}$, reshaped into $h$ slices of width $d_k$, is the same arithmetic as $h$ independent narrow projections, and it is one matrix multiplication instead of $h$ of them. Everything after the reshape carries a head axis and broadcasts over it, so the attention itself is still written once, exactly as in the previous post. The two new lines are the division by `jnp.sqrt(self.d_k)` and the `jnp.where`, and the ordering of that second one is the load-bearing part: it rewrites the scores, before `jax.nn.softmax` runs, so each row renormalizes over its visible prefix.
 
 A block wraps that in the residual and normalization pattern, with the feed-forward network:
 
@@ -301,9 +338,9 @@ A forward pass returns a score for every vocabulary entry at every position, `(1
 flowchart LR
   T["token_ids<br/>(1 × 12)"]
   E["embed + pos<br/>(1 × 12 × 64)"]
-  Q["queries, keys, values<br/>(1 × 4 × 12 × 16)"]
-  S["scores, masked<br/>(1 × 4 × 12 × 12)"]
-  M["merged heads<br/>(1 × 12 × 64)"]
+  Q["queries, keys, values<br/>per head, ×4<br/>(1 × 12 × 16)"]
+  S["scores, masked<br/>per head, ×4<br/>(1 × 12 × 12)"]
+  M["concatenated heads<br/>(1 × 12 × 64)"]
   F["feed-forward<br/>(1 × 12 × 256) → (1 × 12 × 64)"]
   L["logits<br/>(1 × 12 × 1000)"]
 
@@ -336,12 +373,18 @@ flowchart LR
 
 ## Up next
 
-The model above runs but predicts noise, and two of its pieces hand-wavy still: how text convert to token ids, and the embedding table. The next post covers tokenization and embeddings, then trains this stack on a corpus with a next-token objective and samples text out of it.
+The model above runs but predicts noise, and two of its pieces are still hand-wavy: how text is converted to token ids, and the embedding table. The next post covers tokenization and embeddings, then trains this stack on a corpus with a next-token objective and samples text out of it.
 
+<figure>
+<img src="/assets/img/three-transformers.png" alt="Three technical drawings side by side in the same line-art style: William Stanley's 1886 induction coil patent figure, the patent drawing of the Optimus Prime toy in robot form, and the decoder-only stack from this post drawn as a numbered patent figure">
+<figcaption markdown="1">Transformer is a loaded term now.
+Left, W. Stanley Jr., *Induction Coil*, [US 349,611](https://commons.wikimedia.org/wiki/File:StanleyTransformer2.png) (1886). Centre, H. Obara, reconfigurable toy assembly, [US 4,516,948](https://commons.wikimedia.org/wiki/File:Optimus_Prime_patent.png) (filed 1984)
+</figcaption>
+</figure>
 
 ## References
 
-For readers who want the same material from a different angle, Karpathy's [Let's build GPT: from scratch, in code, spelled out](https://youtu.be/kCc8FmEb1nY) builds an equivalent model in PyTorch line by line, Harvard NLP's [The Annotated Transformer](http://nlp.seas.harvard.edu/annotated-transformer/) annotates the original paper with running code, and the [Transformer Explainer](https://poloclub.github.io/transformer-explainer/) runs a real GPT-2 in the browser with every intermediate tensor exposed.
+Karpathy's [Let's build GPT: from scratch, in code, spelled out](https://youtu.be/kCc8FmEb1nY) builds an equivalent model in PyTorch, Harvard NLP's [The Annotated Transformer](http://nlp.seas.harvard.edu/annotated-transformer/) annotates the original paper with running code, and the [Transformer Explainer](https://poloclub.github.io/transformer-explainer/) runs a real GPT-2 in the browser with every intermediate tensor exposed.
 
 [^vaswani]: Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). [*Attention Is All You Need.*](https://arxiv.org/abs/1706.03762) Advances in Neural Information Processing Systems (NeurIPS). For a highly visual walkthrough of the architecture, see [Jay Alammar's *The Illustrated Transformer*](https://jalammar.github.io/illustrated-transformer/).
 [^resnet]: He, K., Zhang, X., Ren, S., & Sun, J. (2015). [*Deep Residual Learning for Image Recognition.*](https://arxiv.org/abs/1512.03385) IEEE Conference on Computer Vision and Pattern Recognition (CVPR).
@@ -358,4 +401,5 @@ For readers who want the same material from a different angle, Karpathy's [Let's
 [^ppo]: Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O. (2017). [*Proximal Policy Optimization Algorithms.*](https://arxiv.org/abs/1707.06347)
 [^grpo]: Shao, Z., Wang, P., Zhu, Q., Xu, R., Song, J., Bi, X., Zhang, H., Zhang, M., Li, Y. K., Wu, Y., & Guo, D. (2024). [*DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models.*](https://arxiv.org/abs/2402.03300) The paper that introduced GRPO.
 [^deepseekr1]: DeepSeek-AI (2025). [*DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning.*](https://arxiv.org/abs/2501.12948)
-[^first]: First post <!--TODO: insert link-->
+[^first]: The multilayer perceptron was built in [the first post in this series]({% post_url 2026-04-07-MachineLearningBeginning %}).
+

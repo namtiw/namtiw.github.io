@@ -36,7 +36,7 @@ Storage building which adds them to the storage chest. This helps in the case wh
   
   
 - #### List of PRs opened
-Here is a [link](https://github.com/pulls?utf8=%E2%9C%93&q=is%3Apr+created%3A2018-05-05..2018-08-13+author%3ANaman-sopho) to a list of PRs opened during the GSoC work period.
+Here is a [link](https://github.com/pulls?utf8=%E2%9C%93&q=is%3Apr+created%3A2018-05-05..2018-08-13+author%3Anamtiw) to a list of PRs opened during the GSoC work period.
 <div class="collapsiblecontainer">
 <div id="BTs" class="collapsibleheader">
 <div align="center">
@@ -79,7 +79,7 @@ Here is a [link](https://github.com/pulls?utf8=%E2%9C%93&q=is%3Apr+created%3A201
 </div>
 </div>
 - #### List of Blog Posts
-  Click [here](https://naman-sopho.github.io/tags#GSoC) for a list of blog posts I made during the summer and [here](https://forum.terasology.org/threads/gsoc-2018-renovation-of-masteroforeon.2171/) for a thread of the project on Terasology's forum.
+  Click [here](/tags#GSoC) for a list of blog posts I made during the summer and [here](https://forum.terasology.org/threads/gsoc-2018-renovation-of-masteroforeon.2171/) for a thread of the project on Terasology's forum.
 - #### Other Links
   - [Forum Thread](https://forum.terasology.org/threads/gsoc-2018-renovation-of-masteroforeon.2171/)
   - [Project Board](http://github.com/Terasology/projects/10)

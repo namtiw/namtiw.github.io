@@ -382,6 +382,13 @@ flowchart TD
 
 As seen above, attention is simply a series of matrix multiplications. The following implementation uses Flax[^flax], a library with handy abstractions for commonly used primitives in machine learning. The linear layers used here are not merely analogous to a matrix multiplication, they are exactly one: [`nnx.Linear`](https://flax.readthedocs.io/en/stable/api_reference/flax.nnx/nn/linear.html) computes $y = xW + b$, and constructing it with `use_bias=False` drops the offset and leaves $y = xW$, a single learned weight matrix and nothing else. Notably, Flax also provides an implementation of [Attention](https://flax.readthedocs.io/en/stable/api_reference/flax.nnx/nn/attention.html), the implementation below is simply a learning exercise. The code in this post runs on jax 0.10.2, flax 0.12.8 and optax 0.2.8; the `nnx.Optimizer` signature in particular changed in recent Flax releases.
 
+<!-- TODO: explain why nnx.Module used in class declaration, also, use same dimensions for queries,keys and values say its convention -->
+<!-- TODO: explain rngs and jax and pure functions and why it is needed for efficient computations -->
+<!-- TODO: encoder makes embeddings decoder predicts next token -->
+<!-- TODO: attention, amount of weight for each element in a sequence -->
+<!-- TODO: use bertviz on jupyter for visualization of attention, comes with BERT model too -->
+
+
 ```python
 import jax
 import jax.numpy as jnp

@@ -243,6 +243,11 @@ Three things changed from the previous post's version. The scores are divided by
 
 A multi-head layer is then just several of those, run on the same input, with their outputs laid side by side:
 
+<!-- TODO: change this to single array and slice results explain how this better performance for hardware, explain that the loop works too conceptually -->
+<!-- TODO: explain embed_dim = num_heads * head_dim so each head sees different parts of the embeddings during training -->
+
+<!-- TODO: matrix multiplication in jax treats first dimension as batch so need to be careful when implementing the network, maybe best to mention during training post -->
+
 ```python
 class MultiHeadAttention(nnx.Module):
     """Multi-head causal self-attention over a batch of sequences."""

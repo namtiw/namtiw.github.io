@@ -383,7 +383,7 @@ accuracy = ((mlp(params, x_moons) > 0.5) == y_moons).mean()  # 0.999
 <figcaption>The decision boundary bending around the moons as training progresses, a curve no single perceptron could draw.</figcaption>
 </figure>
 
-### Conclusion
+### Key Takeaways 
 
 Given enough data and a capable model architecture, interesting emergent properties are observed from the training process: without explicit mention of two classes or a classification problem, the network trains to fit the dataset and becomes capable of classifying unseen inputs correctly (assuming the unseen input follows the same patterns). Some key takeaways from the exercise here are:
 - The number of features, the size of a network, and its architecture (how layers are structured and connected) dictate the nature of problems that it will be able to learn to solve with respectable accuracy.

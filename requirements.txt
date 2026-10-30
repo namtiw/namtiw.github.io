@@ -78,7 +78,7 @@ six==1.17.0
 stack-data==0.6.3
 tensorstore==0.1.84
 tokenizers==0.22.2
-tornado==6.5.7
+tornado==6.6
 tqdm==4.70.0
 traitlets==5.15.1
 transformers==5.14.1

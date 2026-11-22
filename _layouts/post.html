@@ -39,6 +39,10 @@ layout: base
         </div>
       {% endif %}
 
+      {% unless page.toc == false %}
+        <nav id="post-toc" class="post-toc" aria-label="Contents" hidden></nav>
+      {% endunless %}
+
       <div class="blog-post">
         {{ content }}
       </div>

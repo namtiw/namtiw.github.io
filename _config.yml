@@ -134,10 +134,12 @@ footer-hover-col: '#38BDF8'
 site-css:
  - "/assets/css/collapsible.css"
  - "/assets/css/dark-code.css"
+ - "/assets/css/toc.css"
 
 # If you have common JavaScript files that should be included in every page, list them here
 site-js:
  - "/assets/js/collapsible.js"
+ - "/assets/js/toc.js"
 
 #################################
 # --- Web Analytics Section --- #

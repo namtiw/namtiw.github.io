@@ -1,0 +1,110 @@
+/* Side contents menu for posts, filled by assets/js/toc.js.
+   Pinned to the left edge of the screen, greyed out until hovered or
+   focused, current heading bold, only the current section's h3s open.
+   toc.js sets --toc-top / --toc-left / --toc-width from the post's position. */
+
+.post-toc {
+  position: fixed;
+  z-index: 10;
+  top: var(--toc-top, 90px);
+  left: var(--toc-left, 16px);
+  width: var(--toc-width, 200px);
+  max-height: calc(100vh - var(--toc-top, 90px) - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--navbar-border-col) transparent;
+  padding: 4px 6px 4px 0;
+  font-family: var(--header-font);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  opacity: 0.35;
+  transition: opacity 0.2s ease;
+}
+
+.post-toc:hover,
+.post-toc:focus-within {
+  opacity: 1;
+}
+
+.post-toc.post-toc-gone {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Below 1080px there is no room beside the text. */
+@media (max-width: 1079.98px) {
+  .post-toc { display: none; }
+}
+
+.post-toc-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--footer-text-col);
+  margin-bottom: 0.6rem;
+}
+
+.post-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.post-toc li + li {
+  margin-top: 0.45rem;
+}
+
+.post-toc a {
+  display: block;
+  color: var(--footer-text-col);
+  text-decoration: none;
+  font-weight: 400;
+  border-radius: 3px;
+}
+
+.post-toc a:hover {
+  color: var(--text-col);
+  text-decoration: none;
+}
+
+.post-toc a:focus-visible {
+  outline: 2px solid var(--link-col);
+  outline-offset: 2px;
+}
+
+.post-toc a.ancestor {
+  color: var(--text-col);
+}
+
+.post-toc a.active {
+  color: var(--link-col);
+  font-weight: 700;
+}
+
+/* Accordion: h3 lists stay closed until their h2 is the current section. */
+.post-toc-sub {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease, margin-top 0.25s ease;
+}
+
+.post-toc-sub > ul {
+  overflow: hidden;
+  min-height: 0;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--navbar-border-col);
+}
+
+.post-toc li.open > .post-toc-sub {
+  grid-template-rows: 1fr;
+  margin-top: 0.45rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .post-toc,
+  .post-toc-sub {
+    transition: none;
+  }
+}

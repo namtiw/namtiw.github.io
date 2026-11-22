@@ -14,3 +14,7 @@ ehthumbs.db
 CLAUDE.md
 *.iml
 .idea/
+
+# notebooks: Jupyter autosaves and the downloaded TinyShakespeare copy (re-fetched by the notebooks)
+.ipynb_checkpoints/
+assets/notebooks/input.txt

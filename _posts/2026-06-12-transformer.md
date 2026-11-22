@@ -41,6 +41,64 @@ $$\text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^T}{\sqrt{d_k}}\righ
 
  Multi-head attention runs $h$ copies of the mechanism in parallel, each with its own query, key and value projection, and concatenates their outputs. This gives the model more independent representation spaces to allow capturing more context from the input. Intuitively, a sentence consists of multiple relevant contexts to convey full meaning. For instance, resolving a pronoun, tracking which noun a verb agrees with, and finding the object of a preposition are separate lookups.
 
+<!-- TODO:  decide which diagram is better -->
+Each of those N layers is the same shape: two sublayers, each preceded by a LayerNorm and wrapped in a residual connection.
+
+<figure>
+    <pre class="mermaid">
+    graph TD
+        X_in["x_in&lt;br/&gt;(B, L, E)"] --> LN1["LayerNorm 1"]
+        LN1 --> MHA["MultiHeadAttention"]
+        MHA --> Add1["+ (Residual 1)"]
+        X_in --> Add1
+
+        Add1 --> LN2["LayerNorm 2"]
+        LN2 --> W1
+
+        %% MLP Subgraph
+        subgraph MLP_SG["MLP"]
+            direction TB
+            W1["W1 (Linear)"] --> GELU["GELU Activation"]
+            GELU --> W2["W2 (Linear)"]
+        end
+
+        W2 --> Add2["+ (Residual 2)"]
+        Add1 --> Add2
+        Add2 --> X_out["x_out&lt;br/&gt;(B, L, E)"]
+    </pre>
+    <figcaption>One transformer layer. Attention mixes information across positions, the MLP transforms each position independently, and both are added back onto the residual stream rather than replacing it.</figcaption>
+</figure>
+
+The attention sublayer is where the positions actually talk to each other.
+
+<figure>
+    <pre class="mermaid">
+    graph TD
+        MHA_in["norm_x * mask"]
+        MHA_in --> Q["Q_proj"]
+        MHA_in --> K["K_proj"]
+        MHA_in --> V["V_proj"]
+
+        Q --> Reshape_Q["Reshape &amp; Transpose&lt;br/&gt;(B, H, L, H_dim)"]
+        K --> Reshape_K["Reshape &amp; Transpose&lt;br/&gt;(B, H, L, H_dim)"]
+        V --> Reshape_V["Reshape &amp; Transpose&lt;br/&gt;(B, H, L, H_dim)"]
+
+        Reshape_Q --> Dot1["Q @ K.T"]
+        Reshape_K --> Dot1
+
+        Dot1 --> Scale["Scale (1 / sqrt(H_dim))"]
+        Scale --> CausalMask["Apply Causal Mask"]
+        CausalMask --> Softmax["Softmax"]
+
+        Softmax --> Dot2["Scores @ V"]
+        Reshape_V --> Dot2
+
+        Dot2 --> Reshape_Out["Transpose &amp; Reshape&lt;br/&gt;(B, L, E)"]
+        Reshape_Out --> OutProj["Out_proj"]
+    </pre>
+    <figcaption>Inside MultiHeadAttention. The input is projected into queries, keys and values, split across H heads, scored pairwise, masked so no position can attend to a later one, and the weighted values are concatenated back together and projected out.</figcaption>
+</figure>
+
 <figure>
 <pre class="mermaid">
 %%{init: {"flowchart": {"nodeSpacing": 45, "rankSpacing": 60}}}%%

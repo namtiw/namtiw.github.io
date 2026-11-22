@@ -282,6 +282,10 @@ flowchart LR
 
 The $w_i$ are parameters of the model; every arrow in the figure above carries one. As seen above, these control the contribution of a feature to the weighted sum, hence they are known as the weights of a model. The decision tree branching is controlled by the bias ($b$) and activation (step function) terms of a neuron. For instance, suppose that in the network above, neuron 3 in layer 2 should activate whenever neuron 4 in layer 1 is active. Training will assign a large weight to the link between them, labelled $w_{43}$ and highlighted in the figure, so that neuron 4's output dominates neuron 3's weighted sum and reliably pushes it over the activation threshold. For an individual neuron, its affinity to activate is controlled by the bias term and activation: a higher bias implies a higher weighted sum, and a lower activation threshold implies a lower value of the sum activates the neuron.
 
+<!-- TODO: backpropagation: rosenblatt to backprop took many years actually -->
+<!-- TODO: backpropagation: take simple equations chained and show how derivatives can be composed -->
+<!-- TODO: how adding layers helps add more decision boundaries, theoretically exponential growth as compared to polynomial on neurons in the same layer -->
+
 Two notable aspects of the learning algorithm are the measure of the error in its output and the incremental corrections to reduce this error. The error in ML papers is often referred to as the Loss. The raw difference $y - y'$ served the perceptron's update rule, but it makes a poor loss for deeper networks. A signed difference rewards overshooting in the negative direction, and taking its absolute value instead leaves a kink at zero where the derivative is undefined. Squaring the difference fixes both problems: the loss is positive for any mistake, smooth and differentiable everywhere, and its gradient grows with the size of the error, so badly wrong predictions produce large corrections while nearly correct ones barely move the weights[^goodfellow]. This gives the mean squared error, along with its square root, the root mean squared error. The differentiability is what deeper networks need, since they are trained by following gradients of the loss through every layer. Mathematically, the relation between input and output is represented by a complex higher order function. Unlike the linear case, each neuron (weight term) in a layer contributes to the loss differently. In order to correctly update each weight according to its effect on the loss, backpropagation is used. Think of the loss as a curve: for any given point on the curve, the direction of a minimum can be deduced using the slope of the tangent (gradient) at that point.
 
 <figure>
@@ -383,7 +387,7 @@ accuracy = ((mlp(params, x_moons) > 0.5) == y_moons).mean()  # 0.999
 <figcaption>The decision boundary bending around the moons as training progresses, a curve no single perceptron could draw.</figcaption>
 </figure>
 
-### Key Takeaways 
+### 
 
 Given enough data and a capable model architecture, interesting emergent properties are observed from the training process: without explicit mention of two classes or a classification problem, the network trains to fit the dataset and becomes capable of classifying unseen inputs correctly (assuming the unseen input follows the same patterns). Some key takeaways from the exercise here are:
 - The number of features, the size of a network, and its architecture (how layers are structured and connected) dictate the nature of problems that it will be able to learn to solve with respectable accuracy.

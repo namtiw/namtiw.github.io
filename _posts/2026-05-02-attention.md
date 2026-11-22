@@ -194,6 +194,7 @@ $$
 e_{ij} = f_{alignment}\left(h_{i-1}^{dec}, h_j^{enc}\right)\tag{3}
 $$
 
+<!-- TODO: why is softmax called softmax? distributes probabilities according to the difference in values a max would be 1. and rest 0 hence "soft"max-->
 the dot product is large when the two vectors point in a similar direction, i.e. when encoder position $j$ is relevant to what the decoder is about to generate at step $i$. Normalizing these scores with softmax turns them into weights that sum to 1:
 
 $$
